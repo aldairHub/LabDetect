@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/cameraFragment">
+
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.example.labdetect.CameraFragment"
+        android:label="Cámara"
+        tools:layout="@layout/fragment_camera">
+        <action
+            android:id="@+id/action_cameraFragment_to_detailFragment"
+            app:destination="@id/detailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/detailFragment"
+        android:name="com.example.labdetect.DetailFragment"
+        android:label="Detalles"
+        tools:layout="@layout/fragment_detail">
+        <argument
+            android:name="equipmentName"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.example.labdetect.SettingsFragment"
+        android:label="Configuración"
+        tools:layout="@layout/fragment_settings" />
+</navigation>
