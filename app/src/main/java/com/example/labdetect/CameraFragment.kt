@@ -1,8 +1,13 @@
 package com.example.labdetect
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -18,16 +23,23 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.viewmodel.CameraViewModel
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class CameraFragment : Fragment() {
+class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
 
     private var _binding: FragmentCameraBinding? = null
     private val binding get() = _binding!!
-    
+
+    private val classificationHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val classificationInterval = 1000L // cada 1 segundo
+
     private val viewModel: CameraViewModel by viewModels()
     private lateinit var cameraExecutor: ExecutorService
+
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var textToSpeech: TextToSpeech
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -51,8 +63,12 @@ class CameraFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        textToSpeech = TextToSpeech(requireContext(), this)
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
+
         if (allPermissionsGranted()) {
             startCamera()
+            startPeriodicClassification()
         } else {
             requestPermissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
@@ -66,10 +82,35 @@ class CameraFragment : Fragment() {
             }
             findNavController().navigate(R.id.action_cameraFragment_to_detailFragment, bundle)
         }
-        
-        // Simulación de detección al hacer clic en el preview (para probar sin cámara real)
-        binding.viewFinder.setOnClickListener {
-            viewModel.onImageCaptured(android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888))
+
+        binding.fabMic.setOnClickListener {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
+            }
+
+            speechRecognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onResults(results: Bundle?) {
+                    val text = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                    if (!text.isNullOrBlank()) {
+                        viewModel.askAssistant(text)
+                    }
+                }
+                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onError(error: Int) {
+                    Toast.makeText(context, "No entendí, intenta de nuevo", Toast.LENGTH_SHORT).show()
+                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            speechRecognizer.startListening(intent)
         }
 
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
@@ -79,34 +120,48 @@ class CameraFragment : Fragment() {
                 binding.tvConfidence.text = "Confianza: ${"%.1f".format(result.confidence)}%"
             }
         }
+
+        viewModel.assistantAnswer.observe(viewLifecycleOwner) { answer ->
+            textToSpeech.speak(answer, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            textToSpeech.language = Locale("es", "ES")
+        }
+    }
+
+    private fun startPeriodicClassification() {
+        classificationHandler.postDelayed(object : Runnable {
+            override fun run() {
+                binding.viewFinder.bitmap?.let { bitmap ->
+                    viewModel.onImageCaptured(bitmap)
+                }
+                classificationHandler.postDelayed(this, classificationInterval)
+            }
+        }, classificationInterval)
     }
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            // Preview
             val preview = Preview.Builder()
                 .build()
                 .also {
                     it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
 
-            // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
-                // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
-
-                // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
                     this, cameraSelector, preview
                 )
-
                 Toast.makeText(context, "Cámara iniciada", Toast.LENGTH_SHORT).show()
             } catch (exc: Exception) {
                 Log.e("CameraFragment", "Use case binding failed", exc)
@@ -126,6 +181,10 @@ class CameraFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         cameraExecutor.shutdown()
+        classificationHandler.removeCallbacksAndMessages(null)
+        speechRecognizer.destroy()
+        textToSpeech.stop()
+        textToSpeech.shutdown()
         _binding = null
     }
 }
