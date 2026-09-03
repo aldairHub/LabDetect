@@ -1,9 +1,21 @@
+import java.io.File
 import java.util.Properties
 import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
     alias(libs.plugins.androidApplication)
 }
+
+fun String.forBuildConfig(): String = replace("\\", "\\\\").replace("\"", "\\\"")
+
+fun readEnvFileValue(file: File, name: String): String = file
+    .takeIf { it.isFile }
+    ?.readLines()
+    ?.firstOrNull { line -> line.trim().startsWith("$name=") }
+    ?.substringAfter('=')
+    ?.trim()
+    ?.trim('"', '\'')
+    .orEmpty()
 
 android {
     namespace = "com.example.labdetect"
@@ -22,10 +34,19 @@ android {
         rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use {
             localProperties.load(it)
         }
-        val knowledgeApiUrl = localProperties.getProperty("KNOWLEDGE_API_URL", "")
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-        buildConfigField("String", "KNOWLEDGE_API_URL", "\"$knowledgeApiUrl\"")
+        // Para el prototipo, la APK llama directamente a OpenAI. local.properties y
+        // backend/.env están ignorados por Git; la clave nunca se versiona.
+        val openAiApiKey = providers.gradleProperty("OPENAI_API_KEY").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }
+            ?: localProperties.getProperty("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }
+            ?: readEnvFileValue(rootProject.file("backend/.env"), "OPENAI_API_KEY")
+        val openAiModel = localProperties.getProperty("OPENAI_MODEL", "gpt-5.4-mini")
+        val openAiTtsModel = localProperties.getProperty("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+
+        buildConfigField("String", "OPENAI_API_KEY", "\"${openAiApiKey.forBuildConfig()}\"")
+        buildConfigField("String", "OPENAI_MODEL", "\"${openAiModel.forBuildConfig()}\"")
+        buildConfigField("String", "OPENAI_TTS_MODEL", "\"${openAiTtsModel.forBuildConfig()}\"")
     }
 
     buildTypes {

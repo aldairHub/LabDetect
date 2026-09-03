@@ -13,9 +13,6 @@
         <action
             android:id="@+id/action_cameraFragment_to_detailFragment"
             app:destination="@id/detailFragment" />
-        <action
-            android:id="@+id/action_cameraFragment_to_settingsFragment"
-            app:destination="@id/settingsFragment" />
     </fragment>
 
     <fragment
@@ -32,9 +29,4 @@
             android:defaultValue="" />
     </fragment>
 
-    <fragment
-        android:id="@+id/settingsFragment"
-        android:name="com.example.labdetect.SettingsFragment"
-        android:label="Configuración"
-        tools:layout="@layout/fragment_settings" />
 </navigation>

@@ -1,8 +1,9 @@
 # Servicio documental de LabDetect
 
-Este servicio mantiene la clave de OpenAI fuera del APK y crea un almacén vectorial
-independiente para cada variante física. Así, una pregunta sobre un equipo nunca busca
-en los manuales de otro.
+Este servicio mantiene las claves fuera del APK. Cada consulta incluye únicamente el
+texto del manual del equipo detectado, por lo que los 25 equipos funcionan sin depender
+de una indexación previa. Cuando existe un índice de una variante exacta, también puede
+usarlo como contexto adicional.
 
 La carga acepta los manuales exactos declarados como `verified` en
 `knowledge/manual_manifest.json` y las referencias generales entregadas por el
@@ -27,6 +28,9 @@ Variables del servidor:
 - `OPENAI_API_KEY`: obligatoria solo en el servidor.
 - `OPENAI_MODEL`: opcional; por defecto `gpt-5.4-mini`.
 - `LABDETECT_VECTOR_STORES`: ruta opcional al registro generado.
+- `AZURE_SPEECH_KEY` y `AZURE_SPEECH_REGION`: activan Azure Neural Speech. Si faltan,
+  se usa la voz natural de OpenAI; Android queda como respaldo sin conexión.
+- `OPENAI_TTS_MODEL`: opcional; por defecto `gpt-4o-mini-tts`.
 
 El archivo local `backend/.env` ya está preparado y excluido de Git. La clave se
 pega únicamente allí; `app.py` e `ingest_manuals.py` la cargan automáticamente.
@@ -43,7 +47,7 @@ La app recibe únicamente la URL HTTPS del servicio mediante
 `KNOWLEDGE_API_URL=https://...` en `local.properties`. No se introduce una clave de
 OpenAI en Android.
 
-El endpoint `POST /v1/equipment/ask` exige `variant_id` y `question`. Fuerza
-`file_search`, comprueba que hubo fragmentos recuperados y, si la documentación no
-respalda la respuesta, devuelve la frase segura definida en el servidor. La respuesta
-no recita fuentes porque la interfaz presenta el manual por separado.
+El endpoint `POST /v1/equipment/ask` recibe `equipment_id`, la pregunta exacta y una
+variante opcional. Responde en lenguaje natural breve, restringido al equipo, usando
+primero su manual y búsqueda web solo cuando haga falta. `POST /v1/speech` convierte
+esa respuesta a audio con Azure Neural sin revelar la clave al teléfono.

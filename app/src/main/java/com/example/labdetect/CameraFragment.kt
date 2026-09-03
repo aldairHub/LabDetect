@@ -23,6 +23,7 @@ import androidx.navigation.fragment.findNavController
 import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.viewmodel.CameraViewModel
 import com.example.labdetect.speech.AndroidSpeechEngine
+import java.util.Locale
 
 class CameraFragment : Fragment() {
 
@@ -36,6 +37,8 @@ class CameraFragment : Fragment() {
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var speechEngine: AndroidSpeechEngine
+    private var isListening = false
+    private var partialTranscript = ""
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -62,6 +65,7 @@ class CameraFragment : Fragment() {
 
         speechEngine = AndroidSpeechEngine(requireContext())
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
+        configureSpeechRecognizer()
 
         if (cameraPermissionGranted()) {
             startCamera()
@@ -87,35 +91,7 @@ class CameraFragment : Fragment() {
             findNavController().navigate(R.id.action_cameraFragment_to_detailFragment, bundle)
         }
 
-        binding.fabMic.setOnClickListener {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
-            }
-
-            speechRecognizer.setRecognitionListener(object : RecognitionListener {
-                override fun onResults(results: Bundle?) {
-                    val text = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
-                    if (!text.isNullOrBlank()) {
-                        viewModel.askAssistant(text)
-                    }
-                }
-                override fun onReadyForSpeech(params: Bundle?) {}
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
-                override fun onError(error: Int) {
-                    Toast.makeText(context, "No entendí, intenta de nuevo", Toast.LENGTH_SHORT).show()
-                }
-                override fun onPartialResults(partialResults: Bundle?) {}
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
-
-            speechRecognizer.startListening(intent)
-        }
+        binding.fabMic.setOnClickListener { startVoiceQuestion() }
 
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
             if (result != null) {
@@ -125,10 +101,6 @@ class CameraFragment : Fragment() {
             } else {
                 binding.resultCard.visibility = View.GONE
             }
-        }
-
-        binding.btnVoiceSettings.setOnClickListener {
-            findNavController().navigate(R.id.action_cameraFragment_to_settingsFragment)
         }
 
         viewModel.detections.observe(viewLifecycleOwner) { detections ->
@@ -148,6 +120,82 @@ class CameraFragment : Fragment() {
         viewModel.assistantAnswer.observe(viewLifecycleOwner) { answer ->
             speechEngine.speak(answer)
         }
+    }
+
+    private fun configureSpeechRecognizer() {
+        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                isListening = true
+                binding.fabMic.alpha = 0.55f
+                Toast.makeText(context, "Te escucho…", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onResults(results: Bundle?) {
+                finishListening()
+                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull().orEmpty().ifBlank { partialTranscript }
+                if (text.isNotBlank()) viewModel.askAssistant(text)
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                partialTranscript = partialResults
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull().orEmpty()
+            }
+
+            override fun onError(error: Int) {
+                val usablePartial = partialTranscript.takeIf { it.length >= 3 }
+                finishListening()
+                if (usablePartial != null) {
+                    viewModel.askAssistant(usablePartial)
+                } else {
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                            "No alcancé a escucharte. Toca el micrófono y habla de nuevo."
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                            "La escucha necesita conexión. Intenta otra vez."
+                        else -> "No pude escuchar bien. Intenta otra vez."
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = Unit
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        })
+    }
+
+    private fun startVoiceQuestion() {
+        if (!audioPermissionGranted() || isListening) return
+        if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
+            Toast.makeText(context, "El reconocimiento de voz no está disponible.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        partialTranscript = ""
+        speechEngine.stop()
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale("es", "EC").toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, Locale("es", "EC").toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_200L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
+        }
+        runCatching { speechRecognizer.startListening(intent) }
+            .onFailure {
+                finishListening()
+                Toast.makeText(context, "No pude iniciar el micrófono.", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun finishListening() {
+        isListening = false
+        if (_binding != null) binding.fabMic.alpha = 1f
     }
 
     private fun startPeriodicClassification() {

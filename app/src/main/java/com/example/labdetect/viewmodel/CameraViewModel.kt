@@ -17,9 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val detector = OnnxEquipmentDetector(application)
-    private val assistant = KnowledgeApiEquipmentAssistantRepository()
+    private val assistant = KnowledgeApiEquipmentAssistantRepository(application)
     private val equipmentCatalog = LocalEquipmentCatalog(application)
     private val inferenceRunning = AtomicBoolean(false)
+    private var consecutiveMisses = 0
 
     private val _classificationResult = MutableLiveData<ClassificationResult?>()
     val classificationResult: LiveData<ClassificationResult?> = _classificationResult
@@ -38,12 +39,18 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 val results = detector.detect(bitmap)
-                _detections.postValue(results)
-                _classificationResult.postValue(
-                    results.firstOrNull()?.let {
-                        ClassificationResult(it.canonicalId, it.label, it.confidence)
-                    }
-                )
+                if (results.isNotEmpty()) {
+                    consecutiveMisses = 0
+                    _detections.postValue(results)
+                    _classificationResult.postValue(
+                        results.first().let {
+                            ClassificationResult(it.canonicalId, it.label, it.confidence)
+                        }
+                    )
+                } else if (++consecutiveMisses >= MISSES_BEFORE_CLEAR) {
+                    _detections.postValue(emptyList())
+                    _classificationResult.postValue(null)
+                }
             } finally {
                 inferenceRunning.set(false)
             }
@@ -53,22 +60,22 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun askAssistant(question: String) {
         val result = _classificationResult.value
         val profile = result?.let { equipmentCatalog.find(it.canonicalId) }
-        val variant = profile?.variants?.singleOrNull()
         if (result == null) {
-            _assistantAnswer.value = "Primero enfoca un equipo para poder consultar su manual."
+            _assistantAnswer.value = "Enfoca un equipo y vuelve a preguntarme."
             return
         }
-        if (variant == null) {
-            _assistantAnswer.value = "Este equipo tiene varias variantes en el laboratorio. Abre Detalles y selecciona la que tienes delante."
-            return
-        }
+        val variant = profile?.variants?.singleOrNull()
         viewModelScope.launch {
-            _assistantAnswer.postValue(assistant.ask(question, variant.id))
+            _assistantAnswer.postValue(assistant.ask(question, result.canonicalId, variant?.id))
         }
     }
 
     override fun onCleared() {
         detector.close()
         super.onCleared()
+    }
+
+    companion object {
+        private const val MISSES_BEFORE_CLEAR = 3
     }
 }

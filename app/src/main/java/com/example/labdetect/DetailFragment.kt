@@ -65,7 +65,7 @@ class DetailFragment : Fragment() {
         binding.btnAsk.setOnClickListener {
             val question = binding.tietQuestion.text.toString()
             if (question.isNotBlank()) {
-                selectedVariant?.let { viewModel.askAssistant(question, it.id) }
+                viewModel.askAssistant(question, equipmentId, selectedVariant?.id)
             }
         }
 

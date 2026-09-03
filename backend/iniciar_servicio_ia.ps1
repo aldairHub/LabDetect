@@ -4,7 +4,6 @@ $backendDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonExe = Join-Path $env:LOCALAPPDATA "LabDetect\backend-runtime\.venv\Scripts\python.exe"
 $fallbackPython = Join-Path $backendDir ".runtime\.venv\Scripts\python.exe"
 $codexPython = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
-$registry = Join-Path $backendDir "vector_stores.json"
 
 if (-not (Test-Path -LiteralPath $pythonExe)) {
     $pythonExe = $fallbackPython
@@ -21,10 +20,6 @@ if (-not (Test-Path -LiteralPath $pythonExe)) {
         throw "No se encontró Python 3."
     }
 }
-if (-not (Test-Path -LiteralPath $registry)) {
-    throw "Todavía no hay manuales indexados. Ejecuta ACTIVAR_IA_DOCUMENTAL.cmd."
-}
-
 Push-Location $backendDir
 try {
     Write-Host "LabDetect IA disponible en http://0.0.0.0:8000"

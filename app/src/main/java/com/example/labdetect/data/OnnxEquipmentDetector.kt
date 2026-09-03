@@ -13,6 +13,7 @@ import com.example.labdetect.domain.Detection
 import com.example.labdetect.domain.EquipmentDetector
 import org.json.JSONObject
 import java.nio.FloatBuffer
+import kotlin.math.max
 import kotlin.math.min
 
 /** Ejecuta el YOLO exportado en el propio teléfono. No envía imágenes a servidores. */
@@ -48,6 +49,34 @@ class OnnxEquipmentDetector(context: Context) : EquipmentDetector {
     }
 
     override fun detect(bitmap: Bitmap): List<Detection> {
+        val fullFrame = detectFrame(bitmap)
+        if (fullFrame.firstOrNull()?.confidence?.let { it >= ZOOM_TRIGGER_CONFIDENCE } == true) {
+            return fullFrame
+        }
+
+        // Una segunda pasada sobre el centro aumenta el tamaño aparente del equipo. Mejora
+        // la detección a distancia sin cambiar ni reentrenar el modelo.
+        val cropWidth = (bitmap.width * CENTER_CROP_RATIO).toInt().coerceAtLeast(1)
+        val cropHeight = (bitmap.height * CENTER_CROP_RATIO).toInt().coerceAtLeast(1)
+        val cropLeft = (bitmap.width - cropWidth) / 2
+        val cropTop = (bitmap.height - cropHeight) / 2
+        val crop = Bitmap.createBitmap(bitmap, cropLeft, cropTop, cropWidth, cropHeight)
+        val zoomed = try {
+            detectFrame(crop).map { detection ->
+                detection.copy(
+                    left = (cropLeft + detection.left * cropWidth) / bitmap.width,
+                    top = (cropTop + detection.top * cropHeight) / bitmap.height,
+                    right = (cropLeft + detection.right * cropWidth) / bitmap.width,
+                    bottom = (cropTop + detection.bottom * cropHeight) / bitmap.height
+                )
+            }
+        } finally {
+            crop.recycle()
+        }
+        return mergeDetections(fullFrame + zoomed)
+    }
+
+    private fun detectFrame(bitmap: Bitmap): List<Detection> {
         val activeSession = session ?: return emptyList()
         val activeInputName = inputName ?: return emptyList()
         val prepared = letterbox(bitmap)
@@ -69,6 +98,29 @@ class OnnxEquipmentDetector(context: Context) : EquipmentDetector {
         } finally {
             prepared.bitmap.recycle()
         }
+    }
+
+    private fun mergeDetections(detections: List<Detection>): List<Detection> {
+        val accepted = mutableListOf<Detection>()
+        detections.sortedByDescending { it.confidence }.forEach { candidate ->
+            val duplicate = accepted.any {
+                it.canonicalId == candidate.canonicalId && intersectionOverUnion(it, candidate) >= 0.45f
+            }
+            if (!duplicate) accepted += candidate
+        }
+        return accepted.take(MAX_DETECTIONS)
+    }
+
+    private fun intersectionOverUnion(a: Detection, b: Detection): Float {
+        val left = max(a.left, b.left)
+        val top = max(a.top, b.top)
+        val right = min(a.right, b.right)
+        val bottom = min(a.bottom, b.bottom)
+        val intersection = max(0f, right - left) * max(0f, bottom - top)
+        val areaA = max(0f, a.right - a.left) * max(0f, a.bottom - a.top)
+        val areaB = max(0f, b.right - b.left) * max(0f, b.bottom - b.top)
+        val union = areaA + areaB - intersection
+        return if (union > 0f) intersection / union else 0f
     }
 
     private fun letterbox(source: Bitmap): PreparedBitmap {
@@ -157,6 +209,8 @@ class OnnxEquipmentDetector(context: Context) : EquipmentDetector {
         private const val METADATA_ASSET = "labdetect_yolo26n.metadata.json"
         private const val DEFAULT_INPUT_SIZE = 640
         private const val CONFIDENCE_THRESHOLD = 0.25f
+        private const val CENTER_CROP_RATIO = 0.68f
+        private const val ZOOM_TRIGGER_CONFIDENCE = 60f
         private const val MAX_DETECTIONS = 20
     }
 }

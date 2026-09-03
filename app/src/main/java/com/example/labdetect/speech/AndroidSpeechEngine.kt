@@ -1,84 +1,156 @@
 package com.example.labdetect.speech
 
 import android.content.Context
+import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
+import com.example.labdetect.BuildConfig
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
+import java.util.concurrent.Executors
 
-data class SpanishVoice(val id: String, val description: String)
-
-class AndroidSpeechEngine(
-    context: Context,
-    private val onVoicesReady: (List<SpanishVoice>, String?) -> Unit = { _, _ -> }
-) : TextToSpeech.OnInitListener {
+/** Voz neuronal de OpenAI, con TTS del teléfono como respaldo offline. */
+class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences("speech_settings", Context.MODE_PRIVATE)
-    private val tts = TextToSpeech(appContext, this)
-    private var ready = false
-    private var voicesById: Map<String, Voice> = emptyMap()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val executor = Executors.newSingleThreadExecutor()
+    private val fallbackTts = TextToSpeech(appContext, this)
+    private var fallbackReady = false
+    private var player: MediaPlayer? = null
+    private var closed = false
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
-        voicesById = tts.voices
-            .orEmpty()
+        val bestVoice = fallbackTts.voices.orEmpty()
             .filter { it.locale.language == "es" }
-            .associateBy { it.name }
-
-        val savedId = preferences.getString(KEY_VOICE_ID, null)
-        val selected = voicesById[savedId] ?: chooseBestVoice(voicesById.values)
-        if (selected != null) {
-            tts.voice = selected
-            preferences.edit().putString(KEY_VOICE_ID, selected.name).apply()
-        } else {
-            tts.language = Locale("es", "EC")
+            .minWithOrNull(
+                compareBy<Voice> { it.isNetworkConnectionRequired }
+                    .thenBy { localePriority(it.locale) }
+                    .thenByDescending { it.quality }
+            )
+        bestVoice?.let { fallbackTts.voice = it } ?: run {
+            fallbackTts.language = Locale("es", "EC")
         }
-        tts.setSpeechRate(0.96f)
-        tts.setPitch(1.0f)
-        ready = true
-        onVoicesReady(availableVoices(), selected?.name)
-    }
-
-    fun availableVoices(): List<SpanishVoice> = voicesById.values
-        .sortedWith(compareBy<Voice> { it.isNetworkConnectionRequired }.thenBy { localePriority(it.locale) }.thenBy { it.name })
-        .map { voice ->
-            val mode = if (voice.isNetworkConnectionRequired) "en línea" else "sin conexión"
-            SpanishVoice(voice.name, "${voice.locale.displayName} · $mode · ${voice.name}")
-        }
-
-    fun selectVoice(id: String): Boolean {
-        val voice = voicesById[id] ?: return false
-        val result = tts.setVoice(voice) == TextToSpeech.SUCCESS
-        if (result) preferences.edit().putString(KEY_VOICE_ID, id).apply()
-        return result
+        fallbackTts.setSpeechRate(0.98f)
+        fallbackTts.setPitch(1.0f)
+        fallbackReady = true
     }
 
     fun speak(text: String) {
-        if (ready && text.isNotBlank()) {
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "labdetect-answer")
+        val cleanText = text.trim()
+        if (cleanText.isBlank() || closed) return
+        stop()
+        if (BuildConfig.OPENAI_API_KEY.isBlank()) {
+            speakWithFallback(cleanText)
+            return
+        }
+        executor.execute {
+            val audioFile = runCatching {
+                requestOpenAiAudio(cleanText)
+            }.getOrNull()
+            mainHandler.post {
+                if (closed) {
+                    audioFile?.delete()
+                } else if (audioFile != null) {
+                    playAudio(audioFile, cleanText)
+                } else {
+                    speakWithFallback(cleanText)
+                }
+            }
+        }
+    }
+
+    fun stop() {
+        mainHandler.post {
+            runCatching { player?.stop() }
+            player?.release()
+            player = null
+            if (fallbackReady) fallbackTts.stop()
         }
     }
 
     fun close() {
-        tts.stop()
-        tts.shutdown()
+        closed = true
+        executor.shutdownNow()
+        player?.release()
+        player = null
+        fallbackTts.stop()
+        fallbackTts.shutdown()
     }
 
-    private fun chooseBestVoice(voices: Collection<Voice>): Voice? = voices.minWithOrNull(
-        compareBy<Voice> { it.isNetworkConnectionRequired }
-            .thenBy { localePriority(it.locale) }
-            .thenByDescending { it.quality }
-    )
+    private fun requestOpenAiAudio(text: String): File {
+        val connection = (URL(OPENAI_SPEECH_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15_000
+            readTimeout = 45_000
+            doOutput = true
+            setRequestProperty("Authorization", "Bearer ${BuildConfig.OPENAI_API_KEY}")
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "audio/mpeg")
+        }
+        try {
+            val payload = JSONObject()
+                .put("model", BuildConfig.OPENAI_TTS_MODEL)
+                .put("voice", OPENAI_VOICE)
+                .put("input", text)
+                .put(
+                    "instructions",
+                    "Habla en español latino ecuatoriano, con tono cercano, técnico y tranquilo. " +
+                        "Pronuncia con claridad, usa un ritmo conversacional y evita sonar como un anuncio."
+                )
+                .put("response_format", "mp3")
+                .toString()
+            connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
+            if (connection.responseCode !in 200..299) error("Voz neuronal no disponible")
+            return File.createTempFile("labdetect-voice-", ".mp3", appContext.cacheDir).also { file ->
+                connection.inputStream.use { input -> file.outputStream().use(input::copyTo) }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun playAudio(file: File, fallbackText: String) {
+        player = MediaPlayer().apply {
+            setDataSource(file.absolutePath)
+            setOnPreparedListener { it.start() }
+            setOnCompletionListener {
+                it.release()
+                if (player === it) player = null
+                file.delete()
+            }
+            setOnErrorListener { mediaPlayer, _, _ ->
+                mediaPlayer.release()
+                if (player === mediaPlayer) player = null
+                file.delete()
+                speakWithFallback(fallbackText)
+                true
+            }
+            prepareAsync()
+        }
+    }
+
+    private fun speakWithFallback(text: String) {
+        if (fallbackReady && !closed) {
+            fallbackTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "labdetect-answer")
+        }
+    }
 
     private fun localePriority(locale: Locale): Int = when (locale.country) {
         "EC" -> 0
-        "US" -> 1
-        "MX" -> 2
-        "419" -> 3
-        "ES" -> 4
-        else -> 5
+        "MX" -> 1
+        "US", "419" -> 2
+        "ES" -> 3
+        else -> 4
     }
 
     companion object {
-        private const val KEY_VOICE_ID = "voice_id"
+        private const val OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech"
+        private const val OPENAI_VOICE = "coral"
     }
 }

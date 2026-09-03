@@ -2,6 +2,8 @@
 .gradle
 /.gradle-runtime/
 /.gradle-sandbox/
+/.android-sandbox/
+/.kotlin/
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -10,6 +12,7 @@
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
 /.idea/deviceManager.xml
+/SUBIR_CAMBIOS.cmd
 .DS_Store
 **/__pycache__/
 **/*.py[cod]
