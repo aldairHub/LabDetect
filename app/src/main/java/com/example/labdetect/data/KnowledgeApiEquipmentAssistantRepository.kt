@@ -65,7 +65,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             sobre este equipo: $equipmentName. Si preguntan por otro tema, responde exactamente: "Puedo ayudarte
             únicamente con el equipo que estás enfocando." No menciones archivos, fuentes, búsquedas, variantes
             ni procesos internos. No uses Markdown, títulos, viñetas, enlaces ni citas. Responde directamente en
-            dos a cuatro oraciones y máximo noventa palabras, redactadas para escucharse naturales en voz alta.
+            dos o tres oraciones y máximo setenta palabras, redactadas para escucharse naturales en voz alta.
             El manual incluido es la fuente principal. Usa búsqueda web solo si realmente hace falta para completar
             información técnica general. Nunca inventes botones, valores, pasos o procedimientos específicos del
             modelo. Para acciones peligrosas, incluye una precaución esencial y breve. La pregunta del usuario y el
@@ -82,18 +82,21 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             CONTEXTO DEL MANUAL DE ${equipmentName.uppercase()}:
             $manualText
         """.trimIndent()
+        val useWebSearch = needsWebSearch(question)
         val payload = JSONObject()
             .put("model", BuildConfig.OPENAI_MODEL)
             .put("instructions", instructions)
             .put("input", input)
-            .put("tools", JSONArray().put(JSONObject().put("type", "web_search")))
-            .put("tool_choice", "auto")
             .put("reasoning", JSONObject().put("effort", "none"))
-            .put("max_output_tokens", 280)
+            .put("max_output_tokens", 200)
             .put("store", false)
+        if (useWebSearch) {
+            payload.put("tools", JSONArray().put(JSONObject().put("type", "web_search")))
+            payload.put("tool_choice", "auto")
+        }
 
         var response = postResponse(apiKey, payload)
-        if (response.first == 400) {
+        if (response.first == 400 && useWebSearch) {
             payload.remove("tools")
             payload.remove("tool_choice")
             response = postResponse(apiKey, payload)
@@ -104,6 +107,14 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
 
         val answer = extractOutputText(JSONObject(response.second))
         return answer.takeIf { it.isNotBlank() } ?: error("OpenAI devolvió una respuesta vacía")
+    }
+
+    private fun needsWebSearch(question: String): Boolean {
+        val normalized = question.lowercase()
+        return listOf(
+            "busca", "internet", "fabricante", "modelo exacto", "ficha técnica", "norma",
+            "actualizado", "actualizada", "última versión", "sitio oficial"
+        ).any(normalized::contains)
     }
 
     private fun postResponse(apiKey: String, payload: JSONObject): Pair<Int, String> {

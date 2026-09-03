@@ -22,7 +22,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val assistant = KnowledgeApiEquipmentAssistantRepository(application)
     private val equipmentCatalog = LocalEquipmentCatalog(application)
     private val inferenceRunning = AtomicBoolean(false)
+    private val analysisPaused = AtomicBoolean(false)
     private var consecutiveMisses = 0
+    @Volatile private var lastDetectedResult: ClassificationResult? = null
     @Volatile private var conversationTarget: ClassificationResult? = null
     private var assistantJob: Job? = null
 
@@ -42,19 +44,21 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val assistantLoading: LiveData<Boolean> = _assistantLoading
 
     fun onImageCaptured(bitmap: Bitmap) {
+        if (analysisPaused.get()) return
         if (!inferenceRunning.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 val results = detector.detect(bitmap)
+                if (analysisPaused.get()) return@launch
                 if (results.isNotEmpty()) {
                     consecutiveMisses = 0
                     _detections.postValue(results)
                     if (conversationTarget == null) {
-                        _classificationResult.postValue(
-                            results.first().let {
-                                ClassificationResult(it.canonicalId, it.label, it.confidence)
-                            }
-                        )
+                        val detected = results.first().let {
+                            ClassificationResult(it.canonicalId, it.label, it.confidence)
+                        }
+                        lastDetectedResult = detected
+                        _classificationResult.postValue(detected)
                     }
                 } else if (++consecutiveMisses >= MISSES_BEFORE_CLEAR && conversationTarget == null) {
                     _detections.postValue(emptyList())
@@ -67,18 +71,27 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun beginQuestionSession(): Boolean {
-        val detected = _classificationResult.value ?: return false
+        val detected = _classificationResult.value ?: lastDetectedResult ?: return false
         conversationTarget = detected
+        analysisPaused.set(true)
+        _classificationResult.value = detected
+        _detections.value = emptyList()
         return true
     }
 
     fun cancelQuestionSession() {
-        if (_assistantLoading.value != true) conversationTarget = null
+        if (_assistantLoading.value != true) {
+            conversationTarget = null
+            analysisPaused.set(false)
+        }
     }
 
     fun endQuestionSession() {
         conversationTarget = null
+        analysisPaused.set(false)
     }
+
+    fun isAnalysisPaused(): Boolean = analysisPaused.get()
 
     fun askAssistant(question: String) {
         val result = conversationTarget ?: _classificationResult.value
@@ -91,9 +104,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         assistantJob?.cancel()
         assistantJob = viewModelScope.launch {
             _assistantLoading.value = true
-            val answer = assistant.ask(question, result.canonicalId, variant?.id)
-            _assistantAnswer.value = OneShotEvent(answer)
-            _assistantLoading.value = false
+            try {
+                val answer = assistant.ask(question, result.canonicalId, variant?.id)
+                _assistantAnswer.value = OneShotEvent(answer)
+            } finally {
+                _assistantLoading.value = false
+            }
         }
     }
 

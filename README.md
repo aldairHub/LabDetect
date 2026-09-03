@@ -29,7 +29,7 @@
 
 **LabDetect** es una aplicación Android que detecta, localiza e identifica en tiempo real **25 clases de equipos** del Laboratorio de Bromatología de la UTEQ. La cámara se procesa con **CameraX** y el modelo **Ultralytics YOLO26n**, exportado a **ONNX**, se ejecuta completamente dentro del teléfono mediante **ONNX Runtime Mobile**.
 
-Después de detectar un equipo, el usuario puede mantener pulsado el micrófono o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con la voz **Marin** de OpenAI y utiliza **Android TextToSpeech** cuando no hay conexión.
+Después de detectar un equipo, el usuario puede tocar el micrófono para comenzar, hablar con normalidad y tocarlo nuevamente para enviar, o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con la voz **Marin** de OpenAI y utiliza **Android TextToSpeech** cuando no hay conexión.
 
 La aplicación también conserva fichas técnicas, manuales, consultas básicas y favoritos de forma local para seguir siendo útil sin internet.
 
@@ -75,7 +75,7 @@ La aplicación también conserva fichas técnicas, manuales, consultas básicas 
 - <img src="https://api.iconify.design/tabler/device-mobile.svg?color=%2379bc35" width="16" valign="middle"/> Inferencia YOLO completamente local mediante ONNX Runtime.
 - <img src="https://api.iconify.design/tabler/zoom-in.svg?color=%2335d05b" width="16" valign="middle"/> Segunda pasada automática sobre el centro de la imagen para mejorar detecciones lejanas.
 - <img src="https://api.iconify.design/tabler/percentage.svg?color=%23f472b6" width="16" valign="middle"/> Porcentaje de confianza y detección simultánea de varios equipos.
-- <img src="https://api.iconify.design/tabler/microphone.svg?color=%23ef4444" width="16" valign="middle"/> Mantener pulsado para hablar, soltar para enviar y deslizar hacia arriba para bloquear.
+- <img src="https://api.iconify.design/tabler/microphone.svg?color=%23ef4444" width="16" valign="middle"/> Un toque para comenzar a escuchar y otro para enviar la pregunta.
 - <img src="https://api.iconify.design/tabler/message-chatbot.svg?color=%23fb923c" width="16" valign="middle"/> Preguntas por voz o texto con contexto documental del equipo detectado.
 - <img src="https://api.iconify.design/tabler/volume.svg?color=%2379bc35" width="16" valign="middle"/> Lectura natural con OpenAI Marin y respaldo con Android TTS.
 - <img src="https://api.iconify.design/tabler/file-description.svg?color=%23a78bfa" width="16" valign="middle"/> Fichas, características y manuales disponibles offline.
@@ -108,7 +108,7 @@ flowchart TD
 
 1. **CameraX** entrega una imagen de la cámara a la aplicación.
 2. **YOLO26n** identifica el equipo en el propio celular; la fotografía no se envía a OpenAI.
-3. Al pulsar el micrófono, la app congela lógicamente el último equipo detectado para que otra detección no cambie la conversación.
+3. Con el primer toque al micrófono, la app congela lógicamente el último equipo detectado y pausa el análisis YOLO; con el segundo toque termina el dictado y procesa la pregunta.
 4. **Android SpeechRecognizer** convierte la voz a texto, prioriza español de Ecuador, nombres de equipos y términos del laboratorio.
 5. La aplicación recupera de `manual_text.json` el contenido correspondiente al equipo.
 6. Se construye un prompt con tres partes: reglas del asistente, pregunta transcrita y contenido del manual.

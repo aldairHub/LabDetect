@@ -71,6 +71,9 @@ class LocalManualRepository(context: Context) {
         val manual = find(equipmentId)
             ?: return "Todavía no tengo información guardada de este equipo."
         val normalizedQuestion = normalize(question)
+        if (!isEquipmentQuestion(normalizedQuestion, manual)) {
+            return "Puedo ayudarte únicamente con el equipo que estás enfocando."
+        }
         val selected = when {
             containsAny(normalizedQuestion, "seguridad", "precaucion", "riesgo", "peligro", "cuidado") ->
                 manual.safety
@@ -82,13 +85,26 @@ class LocalManualRepository(context: Context) {
                 manual.specifications
             else -> manual.function
         }
-        val answer = naturalSpeech(selected, 82)
+        val answer = naturalSpeech(selected, 70)
         return answer.ifBlank {
             "${manual.displayName} está documentado en el manual guardado. Puedes abrirlo desde los detalles del equipo."
         }
     }
 
     private fun containsAny(text: String, vararg words: String): Boolean = words.any(text::contains)
+
+    private fun isEquipmentQuestion(question: String, manual: LocalManual): Boolean {
+        val equipmentWords = normalize(manual.displayName).split(' ').filter { it.length >= 4 }
+        if (equipmentWords.any(question::contains)) return true
+        return containsAny(
+            question,
+            "equipo", "aparato", "maquina", "esto", "este", "esta", "sirve", "funcion", "que hace",
+            "usar", "uso", "operar", "encender", "apagar", "limpiar", "mantenimiento",
+            "seguridad", "riesgo", "peligro", "precaucion", "temperatura", "capacidad",
+            "rango", "muestra", "medir", "tiempo", "manual", "procedimiento", "calibrar",
+            "caracteristica", "especificacion", "boton", "control", "voltaje", "presion", "velocidad"
+        )
+    }
 
     private fun naturalSpeech(text: String, maxWords: Int): String {
         val cleaned = text

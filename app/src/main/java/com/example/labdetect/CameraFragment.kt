@@ -1,7 +1,6 @@
 package com.example.labdetect
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,8 +10,8 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -49,9 +48,13 @@ class CameraFragment : Fragment() {
     private lateinit var equipmentCatalog: LocalEquipmentCatalog
     private var defaultMicTint: ColorStateList? = null
     private var isListening = false
-    private var recordingLocked = false
     private var partialTranscript = ""
-    private var touchStartY = 0f
+    private var pendingTranscript = ""
+    private var submitWhenReady = false
+    private var startListeningAfterPermission = false
+    private var voiceState = VoiceState.IDLE
+
+    private enum class VoiceState { IDLE, LISTENING, READY_TO_SEND, AWAITING_RESULT, PROCESSING, SPEAKING }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -62,7 +65,11 @@ class CameraFragment : Fragment() {
         } else if (!cameraPermissionGranted()) {
             Toast.makeText(context, "Se necesita la cámara para detectar equipos", Toast.LENGTH_SHORT).show()
         }
-        binding.fabMic.isEnabled = audioPermissionGranted()
+        binding.fabMic.isEnabled = true
+        if (startListeningAfterPermission) {
+            startListeningAfterPermission = false
+            if (audioPermissionGranted()) beginVoiceCapture()
+        }
     }
 
     override fun onCreateView(
@@ -74,7 +81,6 @@ class CameraFragment : Fragment() {
         return binding.root
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         speechEngine = AndroidSpeechEngine(requireContext())
@@ -88,13 +94,13 @@ class CameraFragment : Fragment() {
             startCamera()
             startPeriodicClassification()
         }
-        binding.fabMic.isEnabled = audioPermissionGranted()
+        binding.fabMic.isEnabled = true
         requestMissingPermissions()
 
         binding.btnDetails.setOnClickListener { openCurrentEquipmentDetails() }
         binding.btnQuickFavorite.setOnClickListener { toggleCurrentFavorite() }
         binding.btnFavoritesList.setOnClickListener { showFavorites() }
-        binding.fabMic.setOnTouchListener { _, event -> handleMicTouch(event) }
+        binding.fabMic.setOnClickListener { handleMicClick() }
         binding.btnSendQuestion.setOnClickListener { submitTypedQuestion() }
         binding.tietCameraQuestion.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -104,11 +110,19 @@ class CameraFragment : Fragment() {
         }
 
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
-            binding.resultCard.isVisible = result != null
-            if (result != null) {
+            if (result == null) {
+                binding.resultCard.isVisible = false
+            } else {
+                val animateEntrance = !binding.resultCard.isVisible
+                binding.resultCard.isVisible = true
                 binding.tvEquipmentName.text = result.label
                 binding.tvConfidence.text = "Confianza: ${"%.1f".format(result.confidence)}%"
                 updateQuickFavorite(result.canonicalId)
+                if (animateEntrance) {
+                    binding.resultCard.alpha = 0f
+                    binding.resultCard.translationY = -8f * resources.displayMetrics.density
+                    binding.resultCard.animate().alpha(1f).translationY(0f).setDuration(220L).start()
+                }
             }
         }
 
@@ -124,18 +138,25 @@ class CameraFragment : Fragment() {
 
         viewModel.assistantLoading.observe(viewLifecycleOwner) { loading ->
             binding.pbAssistant.isVisible = loading
-            binding.btnSendQuestion.isEnabled = !loading
-            if (loading && !isListening) showVoiceState("Preparando la respuesta…")
+            binding.btnSendQuestion.isEnabled = !loading && voiceState == VoiceState.IDLE
+            binding.fabMic.isEnabled = !loading && voiceState == VoiceState.IDLE
+            if (loading && !isListening) {
+                voiceState = VoiceState.PROCESSING
+                showVoiceState("Preparando la respuesta…")
+            }
         }
 
         viewModel.assistantAnswer.observe(viewLifecycleOwner) { event ->
             val answer = event.consume() ?: return@observe
             binding.tvCameraAnswer.text = answer
             binding.tvCameraAnswer.isVisible = true
+            binding.tvCameraAnswer.alpha = 0f
+            binding.tvCameraAnswer.animate().alpha(1f).setDuration(180L).start()
+            voiceState = VoiceState.SPEAKING
+            binding.fabMic.isEnabled = false
             showVoiceState("Respondiendo sobre ${binding.tvEquipmentName.text}…")
             speechEngine.speak(answer) {
-                viewModel.endQuestionSession()
-                if (_binding != null) hideVoiceState()
+                if (_binding != null) finishInteraction()
             }
         }
     }
@@ -150,43 +171,41 @@ class CameraFragment : Fragment() {
     private fun configureSpeechRecognizer() {
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
+                if (voiceState != VoiceState.LISTENING) return
                 isListening = true
-                showListeningFeedback(if (recordingLocked) "Micrófono bloqueado · toca para terminar" else "Escuchando… desliza arriba para bloquear")
+                showListeningFeedback("Escuchando · toca otra vez para enviar")
             }
 
             override fun onResults(results: Bundle?) {
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    ?.firstOrNull().orEmpty().ifBlank { partialTranscript }
-                finishListening(processing = text.isNotBlank())
-                if (text.isNotBlank()) {
-                    viewModel.askAssistant(text)
-                } else {
-                    viewModel.cancelQuestionSession()
-                }
+                if (voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
+                isListening = false
+                val text = bestTranscript(results).ifBlank { partialTranscript }
+                handleRecognizedText(text)
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
+                if (voiceState != VoiceState.LISTENING) return
                 partialTranscript = partialResults
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull().orEmpty()
                 if (partialTranscript.isNotBlank()) {
                     val preview = partialTranscript.take(64)
-                    showVoiceState(if (recordingLocked) "🔒 $preview" else "🎙 $preview")
+                    showVoiceState("🎙 $preview")
                 }
             }
 
             override fun onError(error: Int) {
+                if (voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
                 val usablePartial = partialTranscript.takeIf { it.length >= 3 }
-                finishListening(processing = usablePartial != null)
                 if (usablePartial != null) {
-                    viewModel.askAssistant(usablePartial)
+                    isListening = false
+                    handleRecognizedText(usablePartial)
                     return
                 }
-                viewModel.cancelQuestionSession()
-                hideVoiceState()
+                finishInteraction(cancelled = true)
                 val message = when (error) {
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                        "No alcancé a escucharte. Mantén pulsado y habla de nuevo."
+                        "No alcancé a escucharte. Toca el micrófono e inténtalo de nuevo."
                     SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
                         "No hay reconocimiento de voz disponible. Puedes escribir la pregunta."
                     else -> "No pude escuchar bien. También puedes escribir la pregunta."
@@ -195,7 +214,7 @@ class CameraFragment : Fragment() {
             }
 
             override fun onRmsChanged(rmsdB: Float) {
-                if (!isListening || _binding == null) return
+                if (voiceState != VoiceState.LISTENING || _binding == null) return
                 val pulse = (1.05f + (rmsdB.coerceIn(0f, 12f) / 100f))
                 binding.fabMic.scaleX = pulse
                 binding.fabMic.scaleY = pulse
@@ -208,116 +227,168 @@ class CameraFragment : Fragment() {
         })
     }
 
-    private fun handleMicTouch(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                if (recordingLocked && isListening) {
-                    stopVoiceQuestion()
-                    return true
-                }
+    private fun handleMicClick() {
+        when (voiceState) {
+            VoiceState.IDLE -> {
                 if (!audioPermissionGranted()) {
+                    startListeningAfterPermission = true
                     requestPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-                    return true
+                    return
                 }
                 if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
                     Toast.makeText(context, "La voz no está disponible; escribe tu pregunta.", Toast.LENGTH_SHORT).show()
-                    return true
+                    return
                 }
-                speechEngine.stop()
-                viewModel.endQuestionSession()
-                if (!viewModel.beginQuestionSession()) {
-                    Toast.makeText(context, "Primero enfoca un equipo.", Toast.LENGTH_SHORT).show()
-                    return true
-                }
-                touchStartY = event.rawY
-                recordingLocked = false
-                startVoiceQuestion()
-                return true
+                beginVoiceCapture()
             }
-
-            MotionEvent.ACTION_MOVE -> {
-                if (isListening && !recordingLocked && touchStartY - event.rawY >= lockDistancePx()) {
-                    recordingLocked = true
-                    showListeningFeedback("🔒 Micrófono bloqueado · toca para terminar")
-                }
-                return true
-            }
-
-            MotionEvent.ACTION_UP -> {
-                binding.fabMic.performClick()
-                if (isListening && !recordingLocked) stopVoiceQuestion()
-                return true
-            }
-
-            MotionEvent.ACTION_CANCEL -> {
-                if (isListening && !recordingLocked) {
-                    runCatching { speechRecognizer.cancel() }
-                    finishListening(processing = false)
-                    viewModel.cancelQuestionSession()
-                }
-                return true
+            VoiceState.LISTENING -> requestVoiceSubmission()
+            VoiceState.READY_TO_SEND -> submitRecognizedQuestion(pendingTranscript)
+            VoiceState.AWAITING_RESULT, VoiceState.PROCESSING, VoiceState.SPEAKING -> {
+                Toast.makeText(context, "Estoy terminando la respuesta actual.", Toast.LENGTH_SHORT).show()
             }
         }
-        return false
+    }
+
+    private fun beginVoiceCapture() {
+        speechEngine.stop()
+        viewModel.endQuestionSession()
+        if (!viewModel.beginQuestionSession()) {
+            Toast.makeText(context, "Primero enfoca un equipo.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        binding.detectionOverlay.submitDetections(emptyList())
+        binding.tvCameraAnswer.isVisible = false
+        binding.btnSendQuestion.isEnabled = false
+        partialTranscript = ""
+        pendingTranscript = ""
+        submitWhenReady = false
+        voiceState = VoiceState.LISTENING
+        binding.fabMic.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        startVoiceQuestion()
+    }
+
+    private fun requestVoiceSubmission() {
+        submitWhenReady = true
+        voiceState = VoiceState.AWAITING_RESULT
+        binding.fabMic.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        showVoiceState("Procesando lo que dijiste…")
+        binding.fabMic.setImageResource(R.drawable.ic_mic)
+        binding.fabMic.animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
+        runCatching { speechRecognizer.stopListening() }
+        classificationHandler.postDelayed({
+            if (_binding != null && voiceState == VoiceState.AWAITING_RESULT) {
+                if (partialTranscript.isNotBlank()) {
+                    submitRecognizedQuestion(partialTranscript)
+                } else {
+                    finishInteraction(cancelled = true)
+                    Toast.makeText(context, "No escuché una pregunta. Toca para intentarlo otra vez.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }, RECOGNITION_RESULT_TIMEOUT_MS)
+    }
+
+    private fun handleRecognizedText(text: String) {
+        if (text.isBlank()) {
+            finishInteraction(cancelled = true)
+            Toast.makeText(context, "No escuché una pregunta. Toca para intentarlo otra vez.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (submitWhenReady || voiceState == VoiceState.AWAITING_RESULT) {
+            submitRecognizedQuestion(text)
+        } else {
+            pendingTranscript = text
+            voiceState = VoiceState.READY_TO_SEND
+            resetMicVisual(sendMode = true)
+            showVoiceState("Voz capturada · toca para enviar")
+            binding.tvMicHint.text = text.take(72)
+        }
     }
 
     private fun startVoiceQuestion() {
-        partialTranscript = ""
         isListening = true
-        showListeningFeedback("Escuchando… desliza arriba para bloquear")
+        showListeningFeedback("Escuchando · toca otra vez para enviar")
         val locale = Locale("es", "EC").toLanguageTag()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, requireContext().packageName)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10_000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 10_000L)
+            putStringArrayListExtra("android.speech.extra.BIASING_STRINGS", ArrayList(speechVocabulary()))
         }
         runCatching { speechRecognizer.startListening(intent) }
             .onFailure {
-                finishListening(processing = false)
-                viewModel.cancelQuestionSession()
+                finishInteraction(cancelled = true)
                 Toast.makeText(context, "No pude iniciar el micrófono; escribe tu pregunta.", Toast.LENGTH_SHORT).show()
             }
     }
 
-    private fun stopVoiceQuestion() {
-        recordingLocked = false
-        showVoiceState("Procesando lo que dijiste…")
-        runCatching { speechRecognizer.stopListening() }
+    private fun bestTranscript(results: Bundle?): String {
+        val alternatives = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            ?.filter { it.isNotBlank() }.orEmpty()
+        if (alternatives.isEmpty()) return ""
+        val scores = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+        if (scores == null || scores.none { it >= 0f }) return alternatives.first()
+        return alternatives.indices.maxByOrNull { scores.getOrNull(it)?.coerceAtLeast(0f) ?: 0f }
+            ?.let(alternatives::get).orEmpty()
     }
 
-    private fun finishListening(processing: Boolean) {
+    private fun speechVocabulary(): List<String> = buildList {
+        viewModel.classificationResult.value?.label?.let(::add)
+        addAll(equipmentCatalog.equipmentNames())
+        addAll(listOf(
+            "bromatología", "laboratorio", "manual", "funcionamiento", "encender", "apagar",
+            "temperatura", "seguridad", "limpieza", "mantenimiento", "calibración", "muestra",
+            "esterilización", "centrifugación", "procedimiento", "precauciones"
+        ))
+    }.distinct()
+
+    private fun submitRecognizedQuestion(text: String) {
+        if (voiceState in setOf(VoiceState.PROCESSING, VoiceState.SPEAKING) || text.isBlank()) return
         isListening = false
-        recordingLocked = false
-        binding.fabMic.scaleX = 1f
-        binding.fabMic.scaleY = 1f
-        binding.fabMic.backgroundTintList = defaultMicTint
-        binding.tvMicHint.text = "Mantén pulsado para hablar · desliza arriba para bloquear"
-        if (processing) showVoiceState("Preparando la respuesta…") else hideVoiceState()
+        submitWhenReady = false
+        pendingTranscript = ""
+        partialTranscript = ""
+        voiceState = VoiceState.PROCESSING
+        resetMicVisual()
+        showVoiceState("Preparando la respuesta…")
+        viewModel.askAssistant(text.trim())
     }
 
     private fun showListeningFeedback(message: String) {
         showVoiceState(message)
-        binding.fabMic.backgroundTintList = ColorStateList.valueOf(
-            Color.parseColor(if (recordingLocked) "#FB8C00" else "#D32F2F")
-        )
+        binding.fabMic.setImageResource(R.drawable.ic_mic)
+        binding.fabMic.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D32F2F"))
         binding.fabMic.scaleX = 1.1f
         binding.fabMic.scaleY = 1.1f
-        binding.tvMicHint.text = if (recordingLocked) {
-            "Puedes soltar · toca el micrófono para terminar"
-        } else {
-            "Suelta para enviar · desliza arriba para bloquear"
-        }
+        binding.tvMicHint.text = "Habla con normalidad · toca otra vez al terminar"
+    }
+
+    private fun resetMicVisual(sendMode: Boolean = false) {
+        binding.fabMic.animate().cancel()
+        binding.fabMic.scaleX = 1f
+        binding.fabMic.scaleY = 1f
+        binding.fabMic.backgroundTintList = if (sendMode) {
+            ColorStateList.valueOf(Color.parseColor("#79BC35"))
+        } else defaultMicTint
+        binding.fabMic.setImageResource(if (sendMode) R.drawable.ic_send else R.drawable.ic_mic)
     }
 
     private fun showVoiceState(message: String) {
         if (_binding == null) return
+        val animateEntrance = !binding.tvVoiceState.isVisible
         binding.tvVoiceState.text = message
         binding.tvVoiceState.isVisible = true
+        if (animateEntrance) {
+            binding.tvVoiceState.alpha = 0f
+            binding.tvVoiceState.scaleX = 0.94f
+            binding.tvVoiceState.scaleY = 0.94f
+            binding.tvVoiceState.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160L).start()
+        }
     }
 
     private fun hideVoiceState() {
@@ -325,9 +396,24 @@ class CameraFragment : Fragment() {
         binding.tvVoiceState.isVisible = false
     }
 
+    private fun finishInteraction(cancelled: Boolean = false) {
+        isListening = false
+        submitWhenReady = false
+        pendingTranscript = ""
+        partialTranscript = ""
+        voiceState = VoiceState.IDLE
+        resetMicVisual()
+        binding.fabMic.isEnabled = true
+        binding.btnSendQuestion.isEnabled = true
+        binding.tvMicHint.text = "Toca para hablar · toca de nuevo para enviar"
+        hideVoiceState()
+        if (cancelled) viewModel.cancelQuestionSession() else viewModel.endQuestionSession()
+    }
+
     private fun submitTypedQuestion() {
         val question = binding.tietCameraQuestion.text?.toString()?.trim().orEmpty()
         if (question.isBlank()) return
+        if (voiceState != VoiceState.IDLE) return
         speechEngine.stop()
         viewModel.endQuestionSession()
         if (!viewModel.beginQuestionSession()) {
@@ -338,6 +424,8 @@ class CameraFragment : Fragment() {
         binding.tietCameraQuestion.clearFocus()
         requireContext().getSystemService(InputMethodManager::class.java)
             ?.hideSoftInputFromWindow(binding.tietCameraQuestion.windowToken, 0)
+        binding.detectionOverlay.submitDetections(emptyList())
+        voiceState = VoiceState.PROCESSING
         showVoiceState("Preparando la respuesta…")
         viewModel.askAssistant(question)
     }
@@ -388,13 +476,13 @@ class CameraFragment : Fragment() {
             .show()
     }
 
-    private fun lockDistancePx(): Float = 72f * resources.displayMetrics.density
-
     private fun startPeriodicClassification() {
         classificationHandler.postDelayed(object : Runnable {
             override fun run() {
                 if (_binding == null) return
-                binding.viewFinder.bitmap?.let(viewModel::onImageCaptured)
+                if (!viewModel.isAnalysisPaused()) {
+                    binding.viewFinder.bitmap?.let(viewModel::onImageCaptured)
+                }
                 classificationHandler.postDelayed(this, classificationInterval)
             }
         }, classificationInterval)
@@ -435,5 +523,9 @@ class CameraFragment : Fragment() {
         viewModel.endQuestionSession()
         _binding = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private const val RECOGNITION_RESULT_TIMEOUT_MS = 4_000L
     }
 }

@@ -277,7 +277,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:contentDescription="Mantener pulsado para hablar"
+                    android:contentDescription="Tocar para iniciar o terminar la pregunta"
                     app:backgroundTint="@color/lab_teal"
                     app:fabCustomSize="54dp"
                     app:srcCompat="@drawable/ic_mic"
@@ -290,7 +290,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:paddingTop="8dp"
-                android:text="Mantén para hablar  ·  desliza ↑ para bloquear"
+                android:text="Toca para hablar  ·  toca de nuevo para enviar"
                 android:textColor="@color/lab_muted_dark"
                 android:textSize="10sp" />
 
