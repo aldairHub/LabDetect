@@ -12,7 +12,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -156,7 +155,8 @@ class CameraFragment : Fragment() {
             }
 
             override fun onResults(results: Bundle?) {
-                val text = bestTranscript(results).ifBlank { partialTranscript }
+                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull().orEmpty().ifBlank { partialTranscript }
                 finishListening(processing = text.isNotBlank())
                 if (text.isNotBlank()) {
                     viewModel.askAssistant(text)
@@ -231,8 +231,6 @@ class CameraFragment : Fragment() {
                 }
                 touchStartY = event.rawY
                 recordingLocked = false
-                binding.fabMic.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                binding.fabMic.parent?.requestDisallowInterceptTouchEvent(true)
                 startVoiceQuestion()
                 return true
             }
@@ -246,15 +244,17 @@ class CameraFragment : Fragment() {
             }
 
             MotionEvent.ACTION_UP -> {
-                binding.fabMic.parent?.requestDisallowInterceptTouchEvent(false)
                 binding.fabMic.performClick()
                 if (isListening && !recordingLocked) stopVoiceQuestion()
                 return true
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                binding.fabMic.parent?.requestDisallowInterceptTouchEvent(false)
-                if (isListening && !recordingLocked) stopVoiceQuestion()
+                if (isListening && !recordingLocked) {
+                    runCatching { speechRecognizer.cancel() }
+                    finishListening(processing = false)
+                    viewModel.cancelQuestionSession()
+                }
                 return true
             }
         }
@@ -272,14 +272,9 @@ class CameraFragment : Fragment() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, requireContext().packageName)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 8_000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 8_000L)
-            putStringArrayListExtra(
-                "android.speech.extra.BIASING_STRINGS",
-                ArrayList(speechVocabulary())
-            )
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L)
         }
         runCatching { speechRecognizer.startListening(intent) }
             .onFailure {
@@ -288,31 +283,6 @@ class CameraFragment : Fragment() {
                 Toast.makeText(context, "No pude iniciar el micrófono; escribe tu pregunta.", Toast.LENGTH_SHORT).show()
             }
     }
-
-    private fun bestTranscript(results: Bundle?): String {
-        val alternatives = results
-            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            ?.filter { it.isNotBlank() }
-            .orEmpty()
-        if (alternatives.isEmpty()) return ""
-        val confidence = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-        if (confidence == null || confidence.none { it >= 0f }) return alternatives.first()
-        return alternatives.indices.maxByOrNull { index ->
-            confidence.getOrNull(index)?.takeIf { it >= 0f } ?: 0f
-        }?.let(alternatives::get).orEmpty()
-    }
-
-    private fun speechVocabulary(): List<String> = buildList {
-        viewModel.classificationResult.value?.label?.let(::add)
-        addAll(equipmentCatalog.equipmentNames())
-        addAll(
-            listOf(
-                "bromatología", "laboratorio", "manual", "funcionamiento", "encender",
-                "apagar", "temperatura", "seguridad", "limpieza", "mantenimiento",
-                "calibración", "muestra", "esterilización", "centrifugación"
-            )
-        )
-    }.distinct()
 
     private fun stopVoiceQuestion() {
         recordingLocked = false
@@ -391,9 +361,6 @@ class CameraFragment : Fragment() {
 
     private fun updateQuickFavorite(id: String) {
         val isFavorite = favoriteStore.contains(id)
-        binding.btnQuickFavorite.text = ""
-        binding.btnQuickFavorite.contentDescription =
-            if (isFavorite) "Quitar de favoritos" else "Guardar en favoritos"
         binding.btnQuickFavorite.setIconResource(
             if (isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
         )
