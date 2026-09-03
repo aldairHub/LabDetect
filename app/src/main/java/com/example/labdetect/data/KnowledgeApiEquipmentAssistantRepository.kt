@@ -1,6 +1,8 @@
 package com.example.labdetect.data
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.example.labdetect.BuildConfig
 import com.example.labdetect.domain.EquipmentAssistantRepository
 import kotlinx.coroutines.Dispatchers
@@ -13,15 +15,7 @@ import java.net.URL
 /** Asistente autónomo de la APK: usa el manual incluido y llama a OpenAI desde el teléfono. */
 class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssistantRepository {
     private val appContext = context.applicationContext
-    private val manualEntries: JSONObject by lazy {
-        runCatching {
-            JSONObject(
-                appContext.assets.open("manual_text.json")
-                    .bufferedReader(Charsets.UTF_8)
-                    .use { it.readText() }
-            ).getJSONObject("equipment")
-        }.getOrDefault(JSONObject())
-    }
+    private val localManuals = LocalManualRepository(appContext)
 
     override suspend fun ask(
         question: String,
@@ -29,14 +23,14 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         variantId: String?
     ): String = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.OPENAI_API_KEY.trim()
-        if (apiKey.isBlank()) {
-            return@withContext "La conexión con OpenAI no está configurada en esta APK."
+        if (apiKey.isBlank() || !hasInternet()) {
+            return@withContext localManuals.answerOffline(equipmentId, question)
         }
 
-        val manual = manualEntries.optJSONObject(equipmentId)
+        val manual = localManuals.find(equipmentId)
             ?: return@withContext "Todavía no tengo documentación de este equipo."
-        val equipmentName = manual.optString("display_name", equipmentId.replace('_', ' '))
-        val manualText = manual.optString("text").trim()
+        val equipmentName = manual.displayName
+        val manualText = manual.fullText.trim()
         if (manualText.isBlank()) {
             return@withContext "Todavía no tengo documentación de este equipo."
         }
@@ -48,9 +42,15 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
                 manualText = manualText,
                 question = question.trim()
             )
-        }.getOrElse {
-            "No pude consultar OpenAI en este momento. Revisa el internet e inténtalo otra vez."
-        }
+        }.getOrElse { localManuals.answerOffline(equipmentId, question) }
+    }
+
+    private fun hasInternet(): Boolean {
+        val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun requestAnswer(

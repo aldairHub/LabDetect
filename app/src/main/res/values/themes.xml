@@ -1,8 +1,20 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.LabDetect" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/lab_teal_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/lab_violet</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSurface">@color/lab_card</item>
+        <item name="colorOnSurface">@color/lab_text</item>
+        <item name="colorSurfaceVariant">@color/lab_surface</item>
+        <item name="android:colorAccent">@color/lab_teal</item>
+        <item name="android:windowBackground">@color/lab_surface</item>
+        <item name="android:statusBarColor">@color/lab_navy</item>
+        <item name="android:navigationBarColor">@color/lab_navy</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <style name="Theme.LabDetect" parent="Base.Theme.LabDetect" />
