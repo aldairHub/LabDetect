@@ -18,7 +18,7 @@
 
     <View
         android:layout_width="0dp"
-        android:layout_height="220dp"
+        android:layout_height="155dp"
         android:background="@drawable/bg_camera_top_scrim"
         android:importantForAccessibility="no"
         app:layout_constraintEnd_toEndOf="parent"
@@ -34,33 +34,21 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <LinearLayout
+    <TextView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="18dp"
-        android:layout_marginTop="18dp"
-        android:orientation="vertical"
+        android:layout_height="38dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="15dp"
+        android:background="@drawable/bg_status_pill"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:letterSpacing="0.08"
+        android:paddingHorizontal="13dp"
+        android:text="●  CÁMARA ACTIVA"
+        android:textColor="@color/lab_teal"
+        android:textSize="10sp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.08"
-            android:text="LABDETECT"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Asistente de Bromatología"
-            android:textColor="#B8FFFFFF"
-            android:textSize="11sp" />
-    </LinearLayout>
+        app:layout_constraintTop_toTopOf="parent" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnFavoritesList"
@@ -92,10 +80,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="14dp"
-        android:layout_marginTop="82dp"
+        android:layout_marginTop="66dp"
         android:visibility="gone"
         app:cardBackgroundColor="#ED102818"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -106,83 +94,81 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="18dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="11dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_status_pill"
-                android:fontFamily="sans-serif-medium"
-                android:letterSpacing="0.08"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="5dp"
-                android:text="●  EQUIPO DETECTADO"
-                android:textColor="@color/lab_teal"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/tvEquipmentName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="Equipo detectado"
-                android:textColor="@color/white"
-                android:textSize="25sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvConfidence"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Confianza: 0%"
-                android:textColor="#B8FFFFFF"
-                android:textSize="13sp" />
+            <View
+                android:layout_width="4dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_status_pill" />
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="horizontal">
+                android:layout_marginStart="11dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDetails"
-                    android:layout_width="0dp"
-                    android:layout_height="46dp"
-                    android:layout_weight="1"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Ver detalles"
-                    android:textAllCaps="false"
-                    android:textColor="@color/lab_navy"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/lab_teal"
-                    app:cornerRadius="16dp"
-                    app:icon="@drawable/ic_info"
-                    app:iconGravity="textStart"
-                    app:iconTint="@color/lab_navy" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnQuickFavorite"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="46dp"
-                    android:layout_marginStart="10dp"
-                    android:layout_weight="1"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Guardar"
-                    android:textAllCaps="false"
+                <TextView
+                    android:id="@+id/tvEquipmentName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:text="Equipo detectado"
                     android:textColor="@color/white"
-                    app:backgroundTint="#1AFFFFFF"
-                    app:cornerRadius="16dp"
-                    app:icon="@drawable/ic_star_outline"
-                    app:iconGravity="textStart"
-                    app:iconTint="@null"
-                    app:strokeColor="#55FFFFFF" />
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvConfidence"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="Confianza: 0%"
+                    android:textColor="@color/lab_muted_dark"
+                    android:textSize="11sp" />
             </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDetails"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:contentDescription="Ver detalles"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text=""
+                app:backgroundTint="@color/lab_teal"
+                app:cornerRadius="15dp"
+                app:icon="@drawable/ic_info"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="@color/lab_navy" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuickFavorite"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="7dp"
+                android:contentDescription="Guardar en favoritos"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text=""
+                app:backgroundTint="#1AFFFFFF"
+                app:cornerRadius="15dp"
+                app:icon="@drawable/ic_star_outline"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconTint="@null"
+                app:strokeColor="#55FFFFFF" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

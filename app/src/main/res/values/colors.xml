@@ -4,20 +4,20 @@
     <color name="white">#FFFFFFFF</color>
     <color name="lab_navy">#07140A</color>
     <color name="lab_navy_soft">#102818</color>
-    <color name="lab_surface">#F4F8F3</color>
+    <color name="lab_surface">#09180E</color>
     <color name="lab_surface_dark">#09180E</color>
-    <color name="lab_card">#FFFFFFFF</color>
+    <color name="lab_card">#FF12261A</color>
     <color name="lab_card_dark">#FF12261A</color>
     <color name="lab_teal">#35D05B</color>
     <color name="lab_teal_dark">#137A22</color>
     <color name="lab_violet">#79BC35</color>
-    <color name="lab_text">#112116</color>
+    <color name="lab_text">#F7FBF8</color>
     <color name="lab_text_dark">#F8FAFC</color>
-    <color name="lab_muted">#607466</color>
+    <color name="lab_muted">#A5B8A9</color>
     <color name="lab_muted_dark">#B2C5B5</color>
     <color name="lab_success">#2FBF55</color>
     <color name="lab_danger">#FF4D67</color>
     <color name="lab_soft_teal">#E8F8EA</color>
     <color name="lab_soft_violet">#EFF8E6</color>
-    <color name="lab_divider">#DCE8DC</color>
+    <color name="lab_divider">#35513D</color>
 </resources>

@@ -104,7 +104,7 @@
                     android:layout_height="48dp"
                     android:layout_marginTop="6dp"
                     android:backgroundTint="@color/lab_teal"
-                    android:popupBackground="@color/white"
+                    android:popupBackground="@color/lab_card"
                     android:visibility="gone" />
 
                 <TextView
