@@ -1,5 +1,7 @@
 *.iml
 .gradle
+/.gradle-runtime/
+/.gradle-sandbox/
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -7,9 +9,47 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deviceManager.xml
 .DS_Store
+**/__pycache__/
+**/*.py[cod]
 /build
 /captures
+/tmp/
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local YOLO workspace (datasets, environments, training outputs and weights)
+ai/.venv/
+ai/data/
+ai/datasets/
+ai/runs/
+ai/models/
+ai/reports/
+ai/cache/
+ai/**/__pycache__/
+ai/**/*.py[cod]
+ai/**/*.pt
+ai/**/*.onnx
+ai/**/*.engine
+ai/**/*.tflite
+ai/**/*.torchscript
+ai/**/*.mlpackage/
+ai/**/*.ncnn/
+
+# Los manuales comerciales completos siguen fuera del APK y del repositorio.
+# Las referencias generales entregadas por el laboratorio sí se versionan.
+knowledge/manuals/
+!knowledge/manuals/
+knowledge/manuals/*
+!knowledge/manuals/general/
+!knowledge/manuals/general/**
+backend/.env
+backend/vector_stores.json
+backend/.runtime/
+backend/activation.*.log
+
+# Salidas regenerables de la auditoría OCR (contienen rutas locales de la máquina).
+knowledge/photo_audit/*.json
+knowledge/photo_audit/*.jsonl

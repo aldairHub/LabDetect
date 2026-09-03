@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16.dp">
+    android:padding="16dp">
 
     <TextView
         android:id="@+id/tvDetailTitle"
@@ -17,20 +17,51 @@
         android:id="@+id/tvDetailDescription"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16.dp"
+        android:layout_marginTop="16dp"
         android:text="Descripción placeholder..."
         android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/tvVariantLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Selecciona el equipo exacto"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <Spinner
+        android:id="@+id/variantSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvManualStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Documentación en preparación"
+        android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/btnOpenManual"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Abrir manual"
+        android:visibility="gone" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="24.dp"
+        android:layout_marginTop="24dp"
         android:background="#CCCCCC" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16.dp"
+        android:layout_marginTop="16dp"
         android:text="Asistente IA"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -39,7 +70,7 @@
         android:id="@+id/tilQuestion"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8.dp"
+        android:layout_marginTop="8dp"
         android:hint="Haz una pregunta sobre este equipo">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -52,7 +83,7 @@
         android:id="@+id/btnAsk"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8.dp"
+        android:layout_marginTop="8dp"
         android:text="Preguntar" />
 
     <ProgressBar
@@ -60,14 +91,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginTop="16.dp"
+        android:layout_marginTop="16dp"
         android:visibility="gone" />
 
     <TextView
         android:id="@+id/tvAssistantResponse"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16.dp"
+        android:layout_marginTop="16dp"
         android:textSize="14sp"
         android:textIsSelectable="true" />
 

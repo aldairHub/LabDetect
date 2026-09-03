@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -18,8 +19,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val localProperties = Properties()
-        localProperties.load(rootProject.file("local.properties").inputStream())
-        buildConfigField("String", "GEMINI_API_KEY", "\"${localProperties.getProperty("GEMINI_API_KEY")}\"")
+        rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use {
+            localProperties.load(it)
+        }
+        val knowledgeApiUrl = localProperties.getProperty("KNOWLEDGE_API_URL", "")
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "KNOWLEDGE_API_URL", "\"$knowledgeApiUrl\"")
     }
 
     buildTypes {
@@ -32,14 +38,19 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
         viewBinding = true
         buildConfig = true
     }
+}
+
+// Mantiene javac dentro del proceso de Gradle; también evita procesos extra en CI.
+tasks.withType<JavaCompile>().configureEach {
+    options.isFork = false
 }
 
 dependencies {
@@ -62,9 +73,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // Gemini
-    implementation(libs.generative.ai)
-
-    // ML Kit
-    implementation(libs.mlkit.image.labeling)
+    // Detector YOLO local. El modelo ONNX se ejecuta completamente en el teléfono.
+    implementation(libs.onnxruntime.android)
 }

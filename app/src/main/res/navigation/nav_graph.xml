@@ -13,6 +13,9 @@
         <action
             android:id="@+id/action_cameraFragment_to_detailFragment"
             app:destination="@id/detailFragment" />
+        <action
+            android:id="@+id/action_cameraFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment" />
     </fragment>
 
     <fragment
@@ -23,6 +26,10 @@
         <argument
             android:name="equipmentName"
             app:argType="string" />
+        <argument
+            android:name="equipmentId"
+            app:argType="string"
+            android:defaultValue="" />
     </fragment>
 
     <fragment

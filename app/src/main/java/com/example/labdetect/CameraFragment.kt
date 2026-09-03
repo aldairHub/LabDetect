@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -23,11 +22,9 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.viewmodel.CameraViewModel
-import java.util.Locale
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import com.example.labdetect.speech.AndroidSpeechEngine
 
-class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
+class CameraFragment : Fragment() {
 
     private var _binding: FragmentCameraBinding? = null
     private val binding get() = _binding!!
@@ -36,19 +33,20 @@ class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
     private val classificationInterval = 1000L // cada 1 segundo
 
     private val viewModel: CameraViewModel by viewModels()
-    private lateinit var cameraExecutor: ExecutorService
 
     private lateinit var speechRecognizer: SpeechRecognizer
-    private lateinit var textToSpeech: TextToSpeech
+    private lateinit var speechEngine: AndroidSpeechEngine
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions.all { it.value }) {
+        if (permissions[Manifest.permission.CAMERA] == true) {
             startCamera()
-        } else {
-            Toast.makeText(context, "Permisos denegados", Toast.LENGTH_SHORT).show()
+            startPeriodicClassification()
+        } else if (!cameraPermissionGranted()) {
+            Toast.makeText(context, "Se necesita la cámara para detectar equipos", Toast.LENGTH_SHORT).show()
         }
+        binding.fabMic.isEnabled = audioPermissionGranted()
     }
 
     override fun onCreateView(
@@ -61,24 +59,30 @@ class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        cameraExecutor = Executors.newSingleThreadExecutor()
 
-        textToSpeech = TextToSpeech(requireContext(), this)
+        speechEngine = AndroidSpeechEngine(requireContext())
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
 
-        if (allPermissionsGranted()) {
+        if (cameraPermissionGranted()) {
             startCamera()
             startPeriodicClassification()
-        } else {
-            requestPermissionLauncher.launch(
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-            )
+        }
+        binding.fabMic.isEnabled = audioPermissionGranted()
+        val missingPermissions = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO
+        ).filter {
+            ContextCompat.checkSelfPermission(requireContext(), it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPermissions.isNotEmpty()) {
+            requestPermissionLauncher.launch(missingPermissions.toTypedArray())
         }
 
         binding.btnDetails.setOnClickListener {
             val name = binding.tvEquipmentName.text.toString()
             val bundle = Bundle().apply {
                 putString("equipmentName", name)
+                putString("equipmentId", viewModel.classificationResult.value?.canonicalId)
             }
             findNavController().navigate(R.id.action_cameraFragment_to_detailFragment, bundle)
         }
@@ -118,17 +122,31 @@ class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
                 binding.resultCard.visibility = View.VISIBLE
                 binding.tvEquipmentName.text = result.label
                 binding.tvConfidence.text = "Confianza: ${"%.1f".format(result.confidence)}%"
+            } else {
+                binding.resultCard.visibility = View.GONE
+            }
+        }
+
+        binding.btnVoiceSettings.setOnClickListener {
+            findNavController().navigate(R.id.action_cameraFragment_to_settingsFragment)
+        }
+
+        viewModel.detections.observe(viewLifecycleOwner) { detections ->
+            binding.detectionOverlay.submitDetections(detections)
+        }
+
+        viewModel.modelReady.observe(viewLifecycleOwner) { ready ->
+            if (!ready) {
+                Toast.makeText(
+                    context,
+                    "Modelo de detección pendiente de instalar",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
 
         viewModel.assistantAnswer.observe(viewLifecycleOwner) { answer ->
-            textToSpeech.speak(answer, TextToSpeech.QUEUE_FLUSH, null, null)
-        }
-    }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            textToSpeech.language = Locale("es", "ES")
+            speechEngine.speak(answer)
         }
     }
 
@@ -171,20 +189,21 @@ class CameraFragment : Fragment(), TextToSpeech.OnInitListener {
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
-    private fun allPermissionsGranted() = arrayOf(
-        Manifest.permission.CAMERA,
+    private fun cameraPermissionGranted() = ContextCompat.checkSelfPermission(
+        requireContext(),
+        Manifest.permission.CAMERA
+    ) == PackageManager.PERMISSION_GRANTED
+
+    private fun audioPermissionGranted() = ContextCompat.checkSelfPermission(
+        requireContext(),
         Manifest.permission.RECORD_AUDIO
-    ).all {
-        ContextCompat.checkSelfPermission(requireContext(), it) == PackageManager.PERMISSION_GRANTED
-    }
+    ) == PackageManager.PERMISSION_GRANTED
 
     override fun onDestroyView() {
         super.onDestroyView()
-        cameraExecutor.shutdown()
         classificationHandler.removeCallbacksAndMessages(null)
         speechRecognizer.destroy()
-        textToSpeech.stop()
-        textToSpeech.shutdown()
+        speechEngine.close()
         _binding = null
     }
 }

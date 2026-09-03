@@ -9,22 +9,38 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.example.labdetect.DetectionOverlayView
+        android:id="@+id/detectionOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnVoiceSettings"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="Voz"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/resultCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16.dp"
+        android:layout_margin="16dp"
         android:visibility="gone"
         app:cardBackgroundColor="#B3000000"
-        app:cardCornerRadius="12.dp"
-        app:layout_constraintTop_toTopOf="parent">
+        app:cardCornerRadius="12dp"
+        app:layout_constraintTop_toBottomOf="@id/btnVoiceSettings">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="16.dp">
+            android:padding="16dp">
 
             <TextView
                 android:id="@+id/tvEquipmentName"
@@ -47,7 +63,7 @@
                 android:id="@+id/btnDetails"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8.dp"
+                android:layout_marginTop="8dp"
                 android:text="Ver Detalles" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -56,7 +72,7 @@
         android:id="@+id/fabMic"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="32.dp"
+        android:layout_marginBottom="32dp"
         android:contentDescription="Micrófono"
         android:src="@android:drawable/ic_btn_speak_now"
         app:layout_constraintBottom_toBottomOf="parent"

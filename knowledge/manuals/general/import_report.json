@@ -1,0 +1,203 @@
+{
+  "agitador_calentador": {
+    "file": "knowledge/manuals/general/manual_general_agitador_calentador.pdf",
+    "source_pages": [
+      1,
+      3,
+      11
+    ],
+    "page_count": 3
+  },
+  "autoclave": {
+    "file": "knowledge/manuals/general/manual_general_autoclave.pdf",
+    "source_pages": [
+      1,
+      4
+    ],
+    "page_count": 2
+  },
+  "balanza_analitica": {
+    "file": "knowledge/manuals/general/manual_general_balanza_analitica.pdf",
+    "source_pages": [
+      1,
+      5
+    ],
+    "page_count": 2
+  },
+  "bano_maria": {
+    "file": "knowledge/manuals/general/manual_general_bano_maria.pdf",
+    "source_pages": [
+      1,
+      6
+    ],
+    "page_count": 2
+  },
+  "bloque_digestor": {
+    "file": "knowledge/manuals/general/manual_general_bloque_digestor.pdf",
+    "source_pages": [
+      1,
+      7
+    ],
+    "page_count": 2
+  },
+  "bomba_vacio": {
+    "file": "knowledge/manuals/general/manual_general_bomba_vacio.pdf",
+    "source_pages": [
+      1,
+      8
+    ],
+    "page_count": 2
+  },
+  "cabina_flujo_laminar": {
+    "file": "knowledge/manuals/general/manual_general_cabina_flujo_laminar.pdf",
+    "source_pages": [
+      1,
+      9
+    ],
+    "page_count": 2
+  },
+  "sorbona_cabina_extraccion_gases": {
+    "file": "knowledge/manuals/general/manual_general_sorbona_cabina_extraccion_gases.pdf",
+    "source_pages": [
+      1,
+      10
+    ],
+    "page_count": 2
+  },
+  "calorimetro": {
+    "file": "knowledge/manuals/general/manual_general_calorimetro.pdf",
+    "source_pages": [
+      1,
+      12
+    ],
+    "page_count": 2
+  },
+  "centrifuga": {
+    "file": "knowledge/manuals/general/manual_general_centrifuga.pdf",
+    "source_pages": [
+      1,
+      13
+    ],
+    "page_count": 2
+  },
+  "contador_colonias": {
+    "file": "knowledge/manuals/general/manual_general_contador_colonias.pdf",
+    "source_pages": [
+      1,
+      14
+    ],
+    "page_count": 2
+  },
+  "desecador": {
+    "file": "knowledge/manuals/general/manual_general_desecador.pdf",
+    "source_pages": [
+      1,
+      15
+    ],
+    "page_count": 2
+  },
+  "desmineralizador_agua": {
+    "file": "knowledge/manuals/general/manual_general_desmineralizador_agua.pdf",
+    "source_pages": [
+      1,
+      16
+    ],
+    "page_count": 2
+  },
+  "destilador_agua": {
+    "file": "knowledge/manuals/general/manual_general_destilador_agua.pdf",
+    "source_pages": [
+      1,
+      17
+    ],
+    "page_count": 2
+  },
+  "destilador_proteina": {
+    "file": "knowledge/manuals/general/manual_general_destilador_proteina.pdf",
+    "source_pages": [
+      1,
+      18
+    ],
+    "page_count": 2
+  },
+  "estufa": {
+    "file": "knowledge/manuals/general/manual_general_estufa.pdf",
+    "source_pages": [
+      1,
+      19
+    ],
+    "page_count": 2
+  },
+  "extractor_fibra": {
+    "file": "knowledge/manuals/general/manual_general_extractor_fibra.pdf",
+    "source_pages": [
+      1,
+      20
+    ],
+    "page_count": 2
+  },
+  "extractor_grasa": {
+    "file": "knowledge/manuals/general/manual_general_extractor_grasa.pdf",
+    "source_pages": [
+      1,
+      21
+    ],
+    "page_count": 2
+  },
+  "incubadora": {
+    "file": "knowledge/manuals/general/manual_general_incubadora.pdf",
+    "source_pages": [
+      1,
+      22
+    ],
+    "page_count": 2
+  },
+  "manta_calentamiento": {
+    "file": "knowledge/manuals/general/manual_general_manta_calentamiento.pdf",
+    "source_pages": [
+      1,
+      23
+    ],
+    "page_count": 2
+  },
+  "molino_pulverizador": {
+    "file": "knowledge/manuals/general/manual_general_molino_pulverizador.pdf",
+    "source_pages": [
+      1,
+      24
+    ],
+    "page_count": 2
+  },
+  "mufla": {
+    "file": "knowledge/manuals/general/manual_general_mufla.pdf",
+    "source_pages": [
+      1,
+      25
+    ],
+    "page_count": 2
+  },
+  "phmetro": {
+    "file": "knowledge/manuals/general/manual_general_phmetro.pdf",
+    "source_pages": [
+      1,
+      26
+    ],
+    "page_count": 2
+  },
+  "refractometro": {
+    "file": "knowledge/manuals/general/manual_general_refractometro.pdf",
+    "source_pages": [
+      1,
+      27
+    ],
+    "page_count": 2
+  },
+  "viscosimetro": {
+    "file": "knowledge/manuals/general/manual_general_viscosimetro.pdf",
+    "source_pages": [
+      1,
+      28
+    ],
+    "page_count": 2
+  }
+}
