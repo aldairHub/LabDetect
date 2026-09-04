@@ -28,6 +28,12 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // La distribución es para teléfonos Android físicos. Excluir x86/x86_64 evita
+        // empaquetar bibliotecas de emulador que no se usan en esos dispositivos.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val localProperties = Properties()
@@ -42,20 +48,14 @@ android {
             ?: localProperties.getProperty("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }
             ?: readEnvFileValue(rootProject.file("backend/.env"), "OPENAI_API_KEY")
         val openAiModel = localProperties.getProperty("OPENAI_MODEL", "gpt-5.4-mini")
-        val openAiTtsModel = localProperties.getProperty("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
 
         buildConfigField("String", "OPENAI_API_KEY", "\"${openAiApiKey.forBuildConfig()}\"")
         buildConfigField("String", "OPENAI_MODEL", "\"${openAiModel.forBuildConfig()}\"")
-        buildConfigField("String", "OPENAI_TTS_MODEL", "\"${openAiTtsModel.forBuildConfig()}\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
     compileOptions {
@@ -68,11 +68,6 @@ android {
         buildConfig = true
     }
 
-    // El modelo ONNX anterior se conserva en el historial del repositorio, pero no se
-    // empaqueta: la APK usa únicamente el detector YOLO11s en TensorFlow Lite.
-    androidResources {
-        ignoreAssetsPattern = "labdetect_yolo26n.onnx:labdetect_yolo26n.metadata.json"
-    }
 }
 
 // Mantiene javac dentro del proceso de Gradle; también evita procesos extra en CI.
@@ -102,4 +97,11 @@ dependencies {
 
     // Detector YOLO local. El modelo TFLite se ejecuta completamente en el teléfono.
     implementation(libs.tensorflow.lite)
+
+    // Cliente WebSocket para la voz Edge online; no requiere clave de OpenAI.
+    implementation(libs.okhttp)
+
+    // Runtime Apache-2.0 para Piper offline y extracción segura del paquete de voz.
+    implementation(files("libs/sherpa-onnx-1.13.7.aar"))
+    implementation(libs.commons.compress)
 }

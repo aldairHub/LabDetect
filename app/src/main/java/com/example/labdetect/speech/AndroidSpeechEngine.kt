@@ -9,20 +9,17 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
-import com.example.labdetect.BuildConfig
-import org.json.JSONObject
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
 
-/** Voz Marin de OpenAI, con la mejor voz española instalada en Android como respaldo offline. */
+/** Voz Edge online, Piper neural offline y Android como último respaldo. */
 class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
     private val fallbackTts = TextToSpeech(appContext, this)
+    private val edgeTts = EdgeTtsClient(appContext)
+    private val piperTts = PiperSpeechEngine(appContext)
     private var fallbackReady = false
     private var player: MediaPlayer? = null
     private var closed = false
@@ -59,18 +56,19 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
             stopPlayback(completePrevious = true)
             onFinished = finished
             val requestGeneration = ++generation
-            if (BuildConfig.OPENAI_API_KEY.isBlank() || !hasInternet()) {
-                speakWithFallback(cleanText, requestGeneration)
+            if (!hasInternet()) {
+                speakWithOfflineVoice(cleanText, requestGeneration)
             } else {
                 executor.execute {
-                    val audioFile = runCatching { requestOpenAiAudio(cleanText) }.getOrNull()
+                    val audioFile = runCatching { edgeTts.synthesize(cleanText) }.getOrNull()
                     mainHandler.post {
                         if (closed || requestGeneration != generation) {
                             audioFile?.delete()
                         } else if (audioFile != null) {
+                            piperTts.prepareForOfflineUse()
                             playAudio(audioFile, cleanText, requestGeneration)
                         } else {
-                            speakWithFallback(cleanText, requestGeneration)
+                            speakWithOfflineVoice(cleanText, requestGeneration)
                         }
                     }
                 }
@@ -89,39 +87,12 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
         closed = true
         generation++
         executor.shutdownNow()
+        piperTts.close()
         stopPlayback(completePrevious = true)
         fallbackTts.shutdown()
     }
 
-    private fun requestOpenAiAudio(text: String): File {
-        val connection = (URL(OPENAI_SPEECH_URL).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 45_000
-            doOutput = true
-            setRequestProperty("Authorization", "Bearer ${BuildConfig.OPENAI_API_KEY}")
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Accept", "audio/mpeg")
-        }
-        try {
-            val payload = JSONObject()
-                .put("model", BuildConfig.OPENAI_TTS_MODEL)
-                .put("voice", OPENAI_VOICE)
-                .put("input", text)
-                .put("instructions", NATURAL_VOICE_INSTRUCTIONS)
-                .put("response_format", "mp3")
-                .toString()
-            connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload) }
-            if (connection.responseCode !in 200..299) error("Voz neuronal no disponible")
-            return File.createTempFile("labdetect-voice-", ".mp3", appContext.cacheDir).also { file ->
-                connection.inputStream.use { input -> file.outputStream().use(input::copyTo) }
-            }
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun playAudio(file: File, fallbackText: String, requestGeneration: Int) {
+    private fun playAudio(file: java.io.File, fallbackText: String, requestGeneration: Int) {
         player = MediaPlayer().apply {
             setDataSource(file.absolutePath)
             setOnPreparedListener { mediaPlayer ->
@@ -154,6 +125,22 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
             )
         } else {
             completeSpeech()
+        }
+    }
+
+    private fun speakWithOfflineVoice(text: String, requestGeneration: Int) {
+        executor.execute {
+            val offlineAudio = piperTts.synthesizeIfInstalled(text)
+            mainHandler.post {
+                if (closed || requestGeneration != generation) {
+                    offlineAudio?.delete()
+                } else if (offlineAudio != null) {
+                    playAudio(offlineAudio, text, requestGeneration)
+                } else {
+                    piperTts.prepareForOfflineUse()
+                    speakWithFallback(text, requestGeneration)
+                }
+            }
         }
     }
 
@@ -197,13 +184,6 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     }
 
     companion object {
-        private const val OPENAI_SPEECH_URL = "https://api.openai.com/v1/audio/speech"
-        private const val OPENAI_VOICE = "marin"
         private const val UTTERANCE_PREFIX = "labdetect-answer-"
-        private const val NATURAL_VOICE_INSTRUCTIONS =
-            "Habla en español latino con un acento ecuatoriano suave y auténtico. Usa una voz humana, cálida " +
-                "y cercana, como una laboratorista explicándole algo a un compañero frente al equipo. Mantén " +
-                "un ritmo conversacional, con pausas breves y entonación natural. Pronuncia claramente marcas, " +
-                "unidades y términos técnicos. Evita sonar robótica, monótona, exagerada o como un anuncio."
     }
 }

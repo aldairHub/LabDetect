@@ -12,6 +12,9 @@ junitVersion = "1.1.5"
 espressoCore = "3.5.1"
 fragmentKtx = "1.6.2"
 tensorflowLite = "2.16.1"
+# La serie 4.x mantiene compatibilidad binaria directa con Kotlin 1.9 del proyecto.
+okhttp = "4.12.0"
+commonsCompress = "1.28.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +33,8 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

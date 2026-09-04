@@ -29,7 +29,7 @@
 
 **LabDetect** es una aplicación Android que detecta, localiza e identifica en tiempo real **25 clases de equipos** del Laboratorio de Bromatología de la UTEQ. La cámara se procesa con **CameraX** y el modelo **Ultralytics YOLO11s**, exportado a **TensorFlow Lite**, se ejecuta completamente dentro del teléfono.
 
-Después de detectar un equipo, el usuario puede tocar el micrófono para comenzar, hablar con normalidad y tocarlo nuevamente para enviar, o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, mantiene la vista previa de la cámara activa y pausa únicamente el análisis mientras responde. Recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con la voz **Marin** de OpenAI y utiliza **Android TextToSpeech** cuando no hay conexión.
+Después de detectar un equipo, el usuario puede tocar el micrófono para comenzar, hablar con normalidad y tocarlo nuevamente para enviar, o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, mantiene la vista previa de la cámara activa y pausa únicamente el análisis mientras responde. Recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con una voz neuronal latina de **Microsoft Edge Read Aloud**. Si no hay conexión, utiliza la voz neural local **Piper Daniela**; Android TextToSpeech queda como último respaldo.
 
 La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles compactos para no ocultar la cámara. La aplicación conserva fichas técnicas, manuales, consultas, recientes, favoritos y correcciones voluntarias de detección de forma local para seguir siendo útil sin internet.
 
@@ -64,9 +64,10 @@ La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles c
 | **MVVM + LiveData + Coroutines** | Separación de interfaz, estado, detección y consultas asíncronas. |
 | **OpenAI Responses API + File Search** | Recupera primero la sección de características, operación, seguridad o mantenimiento asociada únicamente al equipo detectado. |
 | **OpenAI Web Search** | Se activa solo si el manual no contiene la respuesta; la app lo comunica naturalmente antes de complementar la información. |
-| **OpenAI Audio Speech** | Voz neuronal **Marin** para leer las respuestas naturalmente. |
+| **Microsoft Edge Read Aloud** | Voz neuronal online en español latino para leer las respuestas sin consumir crédito de OpenAI. |
+| **Piper Daniela High int8 + Sherpa-ONNX** | Voz neural offline en español latino. Su paquete se instala una sola vez por Wi-Fi en el almacenamiento privado de la app, para no cargarlo en el APK inicial. |
 | **Android SpeechRecognizer** | Conversión de la pregunta hablada a texto en español de Ecuador, con vocabulario de laboratorio. |
-| **Android TextToSpeech** | Voz de respaldo cuando OpenAI o internet no están disponibles. |
+| **Android TextToSpeech** | Último respaldo si Edge no está disponible y Piper aún no se ha instalado o falla. |
 | **JSON local + SharedPreferences** | Catálogo, manuales, características, favoritos, recientes, historial y retroalimentación local. |
 
 ## <img src="https://api.iconify.design/tabler/trophy.svg?color=%23facc15" width="20" valign="middle"/> Funcionalidades
@@ -81,7 +82,7 @@ La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles c
 - <img src="https://api.iconify.design/tabler/message-chatbot.svg?color=%23fb923c" width="16" valign="middle"/> Preguntas por voz o texto con contexto documental del equipo detectado.
 - <img src="https://api.iconify.design/tabler/files.svg?color=%23a78bfa" width="16" valign="middle"/> Índices File Search aislados por equipo; cada manual se consulta por bloques de características, operación, seguridad o mantenimiento/problemas, mientras el PDF completo queda en Storage.
 - <img src="https://api.iconify.design/tabler/message-circle-2.svg?color=%23facc15" width="16" valign="middle"/> Contexto breve de conversación por equipo para responder de forma natural sin guardar diálogos en el teléfono.
-- <img src="https://api.iconify.design/tabler/volume.svg?color=%2379bc35" width="16" valign="middle"/> Lectura natural con OpenAI Marin y respaldo con Android TTS.
+- <img src="https://api.iconify.design/tabler/volume.svg?color=%2379bc35" width="16" valign="middle"/> Lectura natural con Edge en español latino, Piper neural offline y Android TTS como último respaldo.
 - <img src="https://api.iconify.design/tabler/file-description.svg?color=%23a78bfa" width="16" valign="middle"/> Fichas, características y manuales disponibles offline.
 - <img src="https://api.iconify.design/tabler/bolt.svg?color=%2335d05b" width="16" valign="middle"/> Acciones rápidas offline para consultar función, preparación, seguridad y cierre sin leer un bloque largo.
 - <img src="https://api.iconify.design/tabler/star.svg?color=%23facc15" width="16" valign="middle"/> Equipos favoritos guardados localmente.
@@ -106,9 +107,12 @@ flowchart TD
     J -->|Sí| K[Manual local + reglas + pregunta]
     K --> L[OpenAI Responses API]
     L --> M[Respuesta breve y restringida al equipo]
-    M --> N[OpenAI TTS, voz Marin]
+    M --> N{Voz disponible}
+    N -->|Internet| Q[Edge TTS, voz latina]
+    N -->|Sin internet| R[Piper Daniela offline]
+    R -->|No instalada o error| S[Android TextToSpeech]
     J -->|No| O[Respuesta desde el manual local]
-    O --> P[Android TextToSpeech]
+    O --> N
 ```
 
 ### ¿Cómo se conecta la IA?
@@ -120,7 +124,7 @@ flowchart TD
 5. La aplicación obtiene de `document_index.json` el ID del vector store asignado al equipo, sin usar una base de datos externa.
 6. **File Search** busca en cuatro secciones breves de ese único equipo —características, operación, seguridad y mantenimiento/problemas— y recupera solo las relevantes; los PDFs completos permanecen como respaldo en Storage.
 7. Se construye un prompt con reglas del asistente, pregunta transcrita, resumen local y las secciones recuperadas. La **Responses API** responde únicamente sobre el equipo, en lenguaje natural; si la pregunta no corresponde, la rechaza. Si el manual no cubre la consulta, recién entonces realiza una búsqueda web técnica y avisa que complementa la respuesta con internet.
-8. El texto se envía a **OpenAI Audio Speech** y se reproduce con la voz **Marin**. Si falla la conexión, se utiliza el contenido y la voz offline de Android.
+8. El texto se envía a **Microsoft Edge Read Aloud** y se reproduce con una voz neuronal latina. Si Edge o la conexión fallan, se usa **Piper Daniela**, una voz neural instalada localmente. Si Piper aún no se instaló o no puede iniciarse, Android ofrece el último respaldo de voz.
 
 > Este enfoque es un **RAG documental híbrido**: el catálogo de IDs se incluye en la APK, pero File Search recupera solo las secciones necesarias desde el vector store del equipo. No se expone ni se consulta documentación de otros equipos.
 
@@ -153,13 +157,17 @@ El detector aplica *letterbox*, normalización NHWC, umbral de confianza del 80 
 | Respuesta generativa con OpenAI | — | ✅ |
 | Búsqueda web técnica controlada | — | ✅ |
 | Voz Android TTS | ✅ | ✅ respaldo |
-| Voz neuronal Marin | — | ✅ |
+| Voz neuronal Edge | — | ✅ |
+| Voz neural Piper Daniela | ✅ después de la instalación inicial | ✅ respaldo |
+
+> La voz Piper se descarga silenciosamente una vez, solamente por Wi-Fi/no medido y sin retrasar una respuesta. Una vez instalada, funciona sin conexión y no consume crédito de OpenAI.
 
 ## <img src="https://api.iconify.design/tabler/folder-open.svg?color=%23fbbf24" width="20" valign="middle"/> Estructura del proyecto
 
 ```text
 LabDetect/
 ├── app/
+│   ├── libs/sherpa-onnx-1.13.7.aar             Motor local de Piper
 │   └── src/main/
 │       ├── assets/
 │       │   ├── equipment_catalog.json          Catálogo y variantes
@@ -170,7 +178,7 @@ LabDetect/
 │       ├── java/com/example/labdetect/
 │       │   ├── data/                            TensorFlow Lite, catálogo, manuales y OpenAI
 │       │   ├── domain/                          Entidades y contratos
-│       │   ├── speech/                          OpenAI TTS y Android TTS
+│       │   ├── speech/                          Edge TTS, Piper offline y Android TTS
 │       │   ├── viewmodel/                       Estado y lógica MVVM
 │       │   ├── CameraFragment.kt                Cámara, voz e interacción
 │       │   └── DetailFragment.kt                Ficha, manual y preguntas
@@ -187,7 +195,8 @@ LabDetect/
 - JDK 17.
 - Android SDK 34.
 - Dispositivo físico Android 8.0 o superior con cámara y micrófono.
-- Internet para respuestas y voz de OpenAI.
+- Internet para respuestas de OpenAI y para la voz online de Edge.
+- Wi-Fi/no medido una vez, opcional pero recomendado, para instalar la voz neural offline Piper.
 - Crédito y una clave válida de OpenAI API para el modo online.
 
 ## <img src="https://api.iconify.design/tabler/download.svg?color=%2360a5fa" width="20" valign="middle"/> Instalación
@@ -210,7 +219,6 @@ Agrega estas propiedades a `local.properties` sin subir ese archivo a Git:
 ```properties
 OPENAI_API_KEY=tu_clave_api
 OPENAI_MODEL=gpt-5.4-mini
-OPENAI_TTS_MODEL=gpt-4o-mini-tts
 ```
 
 **4. Ejecutar**
@@ -224,6 +232,7 @@ Conecta un teléfono, concede permisos de cámara y micrófono y ejecuta el mód
 - Las imágenes de la cámara se procesan localmente y no se envían a OpenAI.
 - En el modo online se envían la pregunta, el nombre del equipo y un resumen local corto; File Search recupera de forma remota únicamente los fragmentos pertinentes del manual asignado.
 - El reconocimiento de voz depende del proveedor de reconocimiento configurado en Android y puede usar internet.
+- La voz Piper, cuando se instala, se guarda únicamente en el almacenamiento privado de la aplicación y se ejecuta localmente.
 - La búsqueda web está disponible únicamente como apoyo técnico; el manual local sigue siendo la fuente principal.
 - El asistente está restringido al equipo enfocado y no debe responder temas ajenos.
 
