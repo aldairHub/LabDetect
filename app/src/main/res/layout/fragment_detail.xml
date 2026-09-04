@@ -173,6 +173,93 @@
                     android:textIsSelectable="true"
                     android:textSize="15sp" />
 
+                <LinearLayout
+                    android:id="@+id/quickActionsGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickPurpose"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="Para qué sirve"
+                            android:textAllCaps="false"
+                            android:textColor="@color/lab_teal"
+                            android:textSize="11sp"
+                            app:backgroundTint="#12137A22"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="@color/lab_divider" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickBeforeUse"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="Antes de usar"
+                            android:textAllCaps="false"
+                            android:textColor="@color/lab_teal"
+                            android:textSize="11sp"
+                            app:backgroundTint="#12137A22"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="@color/lab_divider" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickSafety"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="Uso seguro"
+                            android:textAllCaps="false"
+                            android:textColor="@color/lab_teal"
+                            android:textSize="11sp"
+                            app:backgroundTint="#12137A22"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="@color/lab_divider" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnQuickFinish"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="42dp"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="Al terminar"
+                            android:textAllCaps="false"
+                            android:textColor="@color/lab_teal"
+                            android:textSize="11sp"
+                            app:backgroundTint="#12137A22"
+                            app:cornerRadius="14dp"
+                            app:strokeColor="@color/lab_divider" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnOpenManual"
                     android:layout_width="match_parent"
@@ -180,7 +267,7 @@
                     android:layout_marginTop="14dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Abrir manual offline"
+                    android:text="Consultar ficha offline"
                     android:textAllCaps="false"
                     android:textColor="@color/lab_navy"
                     android:textStyle="bold"
@@ -317,6 +404,31 @@
                     android:textColor="@color/lab_text"
                     android:textIsSelectable="true"
                     android:textSize="15sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQuestionHistory"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="4dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Ver consultas recientes"
+                    android:textAllCaps="false"
+                    android:textColor="@color/lab_teal"
+                    android:visibility="gone" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnReportMissing"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Me faltó información"
+                    android:textAllCaps="false"
+                    android:textColor="@color/lab_muted"
+                    android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>

@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "source": "manuales1.zip",
+  "document_scope": "general_reference",
+  "warning": "Los documentos indican que son referencias generales; no sustituyen el manual exacto del modelo.",
+  "equipment": {
+    "agitador_calentador": {
+      "display_name": "Agitador calentador",
+      "vector_store_id": "vs_6a9b120a0ff081919e443675d0aa09a0",
+      "full_file_id": "file-3dxcPAkao6JGEvaWVEZbLJ",
+      "sha256": "b1413d8cf0edd7b89c29d4b2f36648625c63dce5d2574c27e4d97e657224a893",
+      "page_count": 8,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-DMDvz7rS3GpDTa4gzBBAfs",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-6phu3VobGVJJECuyuNsjSS",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-JS7SgBj3G2tB1d57tk1vzP",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-5oaFhBXU7mnctR9M7fXuJX",
+          "pages": "6-8"
+        }
+      ]
+    },
+    "autoclave": {
+      "display_name": "Autoclave",
+      "vector_store_id": "vs_6a9b122ca2788191949598de324dbcde",
+      "full_file_id": "file-4KjG8ngxMqZ89g3L81jci8",
+      "sha256": "987abed7db2775506cd9449dab4f6726a7a842a6e7fc54b2d42863f85807db5f",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-KDjaihV4FEeGQtHBXsZcDZ",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-LNXyqQnpzpMfKmx4XDReYV",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-RQu2T8ny9RFmHNmnQCms9k",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-173mPS3Px82CGRkMeN98x8",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "balanza_analitica": {
+      "display_name": "Balanza analítica",
+      "vector_store_id": "vs_6a9b1256eb408191bbf8f3ae62ab7ea8",
+      "full_file_id": "file-RvFWdXHT57gHcmDaNHjSpP",
+      "sha256": "be309475cf15181b9cd0955ede409ebeb24fb344793528b57d1e9fe46ec844e6",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-4nb5spr98CsiJcfhUFRkC6",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-DJxJrJy4K7ek5VV2q9kqBE",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-B4Tyd1hL5iTE98GbCTTZaw",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-Q27iw41Vovwh4iEVv4Fygs",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "bano_maria": {
+      "display_name": "Baño María",
+      "vector_store_id": "vs_6a9b1277fe10819182cf8fa81fd7916e",
+      "full_file_id": "file-XrBcXVXVq6ST1VGxtu1Bzv",
+      "sha256": "567b04960b61b28e6a2a33b2e3d03d6b439ff5d90de76b004bfee5d397fd7189",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-BWdtguohdrQKTkjP3eiPBv",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-XkedbzjEfFpNS7irqbo2YR",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-NXNG5wMbCYvtsPqwLZYUCZ",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-VMBShsCJWEQJdfFx7PU3j2",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "bloque_digestor": {
+      "display_name": "Bloque digestor",
+      "vector_store_id": "vs_6a9b1299b978819180f0c8d5b2a22524",
+      "full_file_id": "file-GHSyS1EqN9dG9ecDyhXjSz",
+      "sha256": "76db3af549d060c8a692cc27dc30708dd1eec1b27abba52c517aa734403c1878",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-DtFqVGarcwhSFYYA5WNVtd",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-HGQfiqE1Sz5CA9KJ9mCDku",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-Y1LGgowrcdbqVXKEGAwUUw",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-LDtbGnLYPTx32jWbxHjPfG",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "bomba_vacio": {
+      "display_name": "Bomba de vacío",
+      "vector_store_id": "vs_6a9b12bffbe0819186c91f808edda233",
+      "full_file_id": "file-NRLnJ58XbsN2FRPP1kn9Kd",
+      "sha256": "411faae5970d91b79d45ea66b9bf7c0e15706e526767374751e20300bfb17daa",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-MiSiDcGDG3fcrkZMLDZETa",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-Qwu5LbJyzfovTBPa97NqCB",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-A7xQRtNyLMRTegWh3pBzXe",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-AxxKFPPEN6HGTUDq9uprVU",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "cabina_flujo_laminar": {
+      "display_name": "Cabina de flujo laminar",
+      "vector_store_id": "vs_6a9b12e5879c81919b286c5b46e7569b",
+      "full_file_id": "file-8fLzVv46QAJmWkjudLqUQg",
+      "sha256": "6fe429d34e36e4ad6028281e95f7b6952bcba83cab864ae6ba143d9a96636a87",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-7UMPRztSpi5y4XBvVsXTZQ",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-MF7opbPDUQwMMiszNkmNpo",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-7qLKGwjcAmg6UorAfuzFDT",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-KuHZCuYJbkafZ7fj1m44sQ",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "calentador": {
+      "display_name": "Calentador",
+      "vector_store_id": "vs_6a9b131034688191bf19c0f514551c63",
+      "full_file_id": "file-NBxfWhD6oFQRvgSF9WtRHy",
+      "sha256": "f15c9b7f11eda1e1a89c8953d220f714f81a8745397d681b176aa9f471a04537",
+      "page_count": 6,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-NV5ADpPQHftZjDNpsBVoYz",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-1amQjctVKi3iYFgzxjGE5n",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-YF3xq7daJVHdupZjaApyX5",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-QFe3UyeePhym3joWVRoppm",
+          "pages": "6-6"
+        }
+      ]
+    },
+    "calorimetro": {
+      "display_name": "Calorímetro",
+      "vector_store_id": "vs_6a9b1333569c819180ac0c6578082aee",
+      "full_file_id": "file-4YJaTCtg4Z6emPRJi7cfub",
+      "sha256": "3b0021bc6d33cc86d628b41176e03ef89cfd619cb4e14e52e39ae13fc2f4535b",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-2muM2iJrJgu3S4GmnSfdGD",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-AV8enLvMJeBjkmG5M9e2zx",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-34hcY19w29xEk5aeccQsoa",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-TU5dn99gSqTc8zLRhwhHcB",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "centrifuga": {
+      "display_name": "Centrífuga",
+      "vector_store_id": "vs_6a9b135d9e3c8191af01c212e0c5bc28",
+      "full_file_id": "file-Ffg19PtT5R381YM4vKFRkh",
+      "sha256": "c2c7e06e4fa08fbe581f48dd602c0c0f978b91cf4cba60ad412a92aeb7750d55",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-RtYVj5UxZBRTffRA2RaoZJ",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-AxyYMFRVHo22soHMf3cH1q",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-459Yi18zbfuAX2qYytKWKX",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-J14aLA1176TMiAJ8PPnQFg",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "contador_colonias": {
+      "display_name": "Contador de colonias",
+      "vector_store_id": "vs_6a9b138691f881918f749d0aa4dc06db",
+      "full_file_id": "file-JEzNzDe5K7Svk4qoYk8pjZ",
+      "sha256": "86ed32f22d8226de2ef3ddf3f0a49807bb78f31aa18599b2dda01a6d3b499753",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-7MEoXfkR1FuQEw3QkkKf8P",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-FJNNZqnaDrC2xyBz6Ls7hX",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-NaSkE1EfoBACUnwHJZsAMF",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-Wtm8b4bZozpPYDTZaKaLFx",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "desecador": {
+      "display_name": "Desecador",
+      "vector_store_id": "vs_6a9b13a746408191abafd215821126ab",
+      "full_file_id": "file-Sz1NyuAYVLZTQjGvEEjZPu",
+      "sha256": "80c80725556a6bb04baa2e8650e32d45c2c5203fe8dfe45ea9f6a41d4e94aa45",
+      "page_count": 6,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-HJLkpXYaGSaLRogDz294va",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-F3UbHpSiuVwQyEBN3CCpme",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-Ccoopu29REdSTpamiAokir",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-W66seAN7RhtS23JKr3PNyk",
+          "pages": "6-6"
+        }
+      ]
+    },
+    "desmineralizador_agua": {
+      "display_name": "Desmineralizador de agua",
+      "vector_store_id": "vs_6a9b13cc827881918e6e29da360d7310",
+      "full_file_id": "file-LRkvXewuP6u3CThiCackV3",
+      "sha256": "dca244c0f50bc8619e740392197d2980741cbe00cd19b2f9b993bb982aab0004",
+      "page_count": 6,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-3AuDm3JF33sJU68sfYc5MS",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-JsK2nT7D1FAtGq84Q1fzMV",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-X9VKm7eyAZK4uqqjAdessB",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-QdsoNSGPC3Wtbx7nsbtuV6",
+          "pages": "6-6"
+        }
+      ]
+    }
+  }
+}

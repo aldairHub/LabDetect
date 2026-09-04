@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -27,6 +28,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.example.labdetect.data.FavoriteEquipmentStore
+import com.example.labdetect.data.EquipmentInteractionStore
 import com.example.labdetect.data.LocalEquipmentCatalog
 import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.speech.AndroidSpeechEngine
@@ -45,6 +47,7 @@ class CameraFragment : Fragment() {
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var speechEngine: AndroidSpeechEngine
     private lateinit var favoriteStore: FavoriteEquipmentStore
+    private lateinit var interactionStore: EquipmentInteractionStore
     private lateinit var equipmentCatalog: LocalEquipmentCatalog
     private var defaultMicTint: ColorStateList? = null
     private var isListening = false
@@ -53,6 +56,12 @@ class CameraFragment : Fragment() {
     private var submitWhenReady = false
     private var startListeningAfterPermission = false
     private var voiceState = VoiceState.IDLE
+    private var activeQuestionEquipmentId: String? = null
+    private var activeQuestionEquipmentName: String? = null
+    private var activeQuestionFrame: Bitmap? = null
+    private var lastSubmittedQuestion: String = ""
+    private var lastRememberedEquipmentId: String? = null
+    private val feedbackShownFor = mutableSetOf<String>()
 
     private enum class VoiceState { IDLE, LISTENING, READY_TO_SEND, AWAITING_RESULT, PROCESSING, SPEAKING }
 
@@ -86,6 +95,7 @@ class CameraFragment : Fragment() {
         speechEngine = AndroidSpeechEngine(requireContext())
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
         favoriteStore = FavoriteEquipmentStore(requireContext())
+        interactionStore = EquipmentInteractionStore(requireContext())
         equipmentCatalog = LocalEquipmentCatalog(requireContext())
         defaultMicTint = binding.fabMic.backgroundTintList
         configureSpeechRecognizer()
@@ -100,6 +110,8 @@ class CameraFragment : Fragment() {
         binding.btnDetails.setOnClickListener { openCurrentEquipmentDetails() }
         binding.btnQuickFavorite.setOnClickListener { toggleCurrentFavorite() }
         binding.btnFavoritesList.setOnClickListener { showFavorites() }
+        binding.btnFeedbackYes.setOnClickListener { saveDetectionFeedback(null) }
+        binding.btnFeedbackCorrect.setOnClickListener { showCorrectionPicker() }
         binding.fabMic.setOnClickListener { handleMicClick() }
         binding.btnSendQuestion.setOnClickListener { submitTypedQuestion() }
         binding.tietCameraQuestion.setOnEditorActionListener { _, actionId, _ ->
@@ -116,8 +128,12 @@ class CameraFragment : Fragment() {
                 val animateEntrance = !binding.resultCard.isVisible
                 binding.resultCard.isVisible = true
                 binding.tvEquipmentName.text = result.label
-                binding.tvConfidence.text = "Confianza: ${"%.1f".format(result.confidence)}%"
+                binding.tvConfidence.text = "${"%.1f".format(result.confidence)}% de confianza"
                 updateQuickFavorite(result.canonicalId)
+                if (lastRememberedEquipmentId != result.canonicalId) {
+                    interactionStore.rememberSeen(result.canonicalId)
+                    lastRememberedEquipmentId = result.canonicalId
+                }
                 if (animateEntrance) {
                     binding.resultCard.alpha = 0f
                     binding.resultCard.translationY = -8f * resources.displayMetrics.density
@@ -151,12 +167,27 @@ class CameraFragment : Fragment() {
             binding.tvCameraAnswer.text = answer
             binding.tvCameraAnswer.isVisible = true
             binding.tvCameraAnswer.alpha = 0f
-            binding.tvCameraAnswer.animate().alpha(1f).setDuration(180L).start()
+            binding.tvCameraAnswer.translationY = 8f * resources.displayMetrics.density
+            binding.tvCameraAnswer.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(220L)
+                .start()
+            val equipmentId = activeQuestionEquipmentId.orEmpty()
+            if (equipmentId.isNotBlank()) {
+                interactionStore.rememberQuestion(equipmentId, lastSubmittedQuestion, answer)
+                if (answer.startsWith("No cuento con esa información dentro de mis manuales")) {
+                    interactionStore.rememberMissingInformation(equipmentId, lastSubmittedQuestion)
+                }
+            }
             voiceState = VoiceState.SPEAKING
             binding.fabMic.isEnabled = false
             showVoiceState("Respondiendo sobre ${binding.tvEquipmentName.text}…")
             speechEngine.speak(answer) {
-                if (_binding != null) finishInteraction()
+                if (_binding != null) {
+                    finishInteraction()
+                    showDetectionFeedbackIfNeeded()
+                }
             }
         }
     }
@@ -256,6 +287,7 @@ class CameraFragment : Fragment() {
             Toast.makeText(context, "Primero enfoca un equipo.", Toast.LENGTH_SHORT).show()
             return
         }
+        setActiveQuestionEquipment()
         binding.detectionOverlay.submitDetections(emptyList())
         binding.tvCameraAnswer.isVisible = false
         binding.btnSendQuestion.isEnabled = false
@@ -353,6 +385,7 @@ class CameraFragment : Fragment() {
         submitWhenReady = false
         pendingTranscript = ""
         partialTranscript = ""
+        lastSubmittedQuestion = text.trim()
         voiceState = VoiceState.PROCESSING
         resetMicVisual()
         showVoiceState("Preparando la respuesta…")
@@ -362,7 +395,7 @@ class CameraFragment : Fragment() {
     private fun showListeningFeedback(message: String) {
         showVoiceState(message)
         binding.fabMic.setImageResource(R.drawable.ic_mic)
-        binding.fabMic.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D32F2F"))
+        binding.fabMic.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#35D05B"))
         binding.fabMic.scaleX = 1.1f
         binding.fabMic.scaleY = 1.1f
         binding.tvMicHint.text = "Habla con normalidad · toca otra vez al terminar"
@@ -420,12 +453,14 @@ class CameraFragment : Fragment() {
             Toast.makeText(context, "Primero enfoca un equipo.", Toast.LENGTH_SHORT).show()
             return
         }
+        setActiveQuestionEquipment()
         binding.tietCameraQuestion.text?.clear()
         binding.tietCameraQuestion.clearFocus()
         requireContext().getSystemService(InputMethodManager::class.java)
             ?.hideSoftInputFromWindow(binding.tietCameraQuestion.windowToken, 0)
         binding.detectionOverlay.submitDetections(emptyList())
         voiceState = VoiceState.PROCESSING
+        lastSubmittedQuestion = question
         showVoiceState("Preparando la respuesta…")
         viewModel.askAssistant(question)
     }
@@ -455,14 +490,19 @@ class CameraFragment : Fragment() {
     }
 
     private fun showFavorites() {
-        val profiles = favoriteStore.all().mapNotNull(equipmentCatalog::find).sortedBy { it.displayName }
+        val favorites = favoriteStore.all().mapNotNull(equipmentCatalog::find).sortedBy { it.displayName }
+        val recent = interactionStore.recentEquipmentIds().mapNotNull(equipmentCatalog::find)
+        val profiles = (favorites + recent).distinctBy { it.id }
         if (profiles.isEmpty()) {
-            Toast.makeText(context, "Todavía no tienes equipos favoritos.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Aún no tienes equipos recientes ni favoritos.", Toast.LENGTH_SHORT).show()
             return
         }
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Equipos favoritos")
-            .setItems(profiles.map { it.displayName }.toTypedArray()) { _, index ->
+            .setTitle("Favoritos y recientes")
+            .setItems(profiles.map { profile ->
+                val prefix = if (favoriteStore.contains(profile.id)) "★ " else "◷ "
+                prefix + profile.displayName
+            }.toTypedArray()) { _, index ->
                 val profile = profiles[index]
                 findNavController().navigate(
                     R.id.action_cameraFragment_to_detailFragment,
@@ -473,6 +513,43 @@ class CameraFragment : Fragment() {
                 )
             }
             .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun setActiveQuestionEquipment() {
+        val result = viewModel.classificationResult.value ?: return
+        activeQuestionEquipmentId = result.canonicalId
+        activeQuestionEquipmentName = result.label
+        activeQuestionFrame = binding.viewFinder.bitmap?.copy(Bitmap.Config.ARGB_8888, false)
+        binding.feedbackBar.isVisible = false
+    }
+
+    private fun showDetectionFeedbackIfNeeded() {
+        val id = activeQuestionEquipmentId ?: return
+        if (!feedbackShownFor.add(id)) return
+        binding.tvFeedbackPrompt.text = "¿Era ${activeQuestionEquipmentName ?: "este equipo"}?"
+        binding.feedbackBar.isVisible = true
+        binding.feedbackBar.alpha = 0f
+        binding.feedbackBar.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun saveDetectionFeedback(correctedId: String?) {
+        val predictedId = activeQuestionEquipmentId ?: return
+        interactionStore.saveDetectionFeedback(predictedId, correctedId, activeQuestionFrame)
+        activeQuestionFrame = null
+        binding.feedbackBar.isVisible = false
+        Toast.makeText(context, if (correctedId == null) "Gracias, quedó confirmado." else "Corrección guardada para mejorar el modelo.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showCorrectionPicker() {
+        val profiles = equipmentCatalog.all().sortedBy { it.displayName }
+        val labels = profiles.map { it.displayName } + "Ninguno de estos"
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("¿Qué equipo era?")
+            .setItems(labels.toTypedArray()) { _, index ->
+                saveDetectionFeedback(profiles.getOrNull(index)?.id ?: "none")
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 

@@ -67,6 +67,12 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    // El modelo ONNX anterior se conserva en el historial del repositorio, pero no se
+    // empaqueta: la APK usa únicamente el detector YOLO11s en TensorFlow Lite.
+    androidResources {
+        ignoreAssetsPattern = "labdetect_yolo26n.onnx:labdetect_yolo26n.metadata.json"
+    }
 }
 
 // Mantiene javac dentro del proceso de Gradle; también evita procesos extra en CI.
@@ -94,6 +100,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // Detector YOLO local. El modelo ONNX se ejecuta completamente en el teléfono.
-    implementation(libs.onnxruntime.android)
+    // Detector YOLO local. El modelo TFLite se ejecuta completamente en el teléfono.
+    implementation(libs.tensorflow.lite)
 }

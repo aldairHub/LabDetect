@@ -1,5 +1,6 @@
 *.iml
 .gradle
+/.gradle-local/
 /.gradle-runtime/
 /.gradle-sandbox/
 /.android-sandbox/

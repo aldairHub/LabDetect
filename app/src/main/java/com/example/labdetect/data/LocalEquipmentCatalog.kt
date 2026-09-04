@@ -47,4 +47,6 @@ class LocalEquipmentCatalog(context: Context) {
     fun find(id: String): EquipmentProfile? = profiles[id]
 
     fun equipmentNames(): List<String> = profiles.values.map { it.displayName }
+
+    fun all(): List<EquipmentProfile> = profiles.values.toList()
 }

@@ -11,8 +11,8 @@
   <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=flat&logo=kotlin&logoColor=white" alt="Kotlin">
   <img src="https://img.shields.io/badge/Android-3DDC84?style=flat&logo=android&logoColor=white" alt="Android">
   <img src="https://img.shields.io/badge/CameraX-137A22?style=flat&logo=android&logoColor=white" alt="CameraX">
-  <img src="https://img.shields.io/badge/YOLO26n-35D05B?style=flat&logo=yolo&logoColor=black" alt="YOLO26n">
-  <img src="https://img.shields.io/badge/ONNX%20Runtime-005CED?style=flat&logo=onnx&logoColor=white" alt="ONNX Runtime">
+  <img src="https://img.shields.io/badge/YOLO11s-35D05B?style=flat&logo=yolo&logoColor=black" alt="YOLO11s">
+  <img src="https://img.shields.io/badge/TensorFlow%20Lite-FF6F00?style=flat&logo=tensorflow&logoColor=white" alt="TensorFlow Lite">
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white" alt="PyTorch">
   <img src="https://img.shields.io/badge/Roboflow-6706CE?style=flat&logo=roboflow&logoColor=white" alt="Roboflow">
@@ -27,11 +27,11 @@
 
 ## <img src="https://api.iconify.design/tabler/info-circle.svg?color=%2335d05b" width="20" valign="middle"/> Descripción
 
-**LabDetect** es una aplicación Android que detecta, localiza e identifica en tiempo real **25 clases de equipos** del Laboratorio de Bromatología de la UTEQ. La cámara se procesa con **CameraX** y el modelo **Ultralytics YOLO26n**, exportado a **ONNX**, se ejecuta completamente dentro del teléfono mediante **ONNX Runtime Mobile**.
+**LabDetect** es una aplicación Android que detecta, localiza e identifica en tiempo real **25 clases de equipos** del Laboratorio de Bromatología de la UTEQ. La cámara se procesa con **CameraX** y el modelo **Ultralytics YOLO11s**, exportado a **TensorFlow Lite**, se ejecuta completamente dentro del teléfono.
 
-Después de detectar un equipo, el usuario puede tocar el micrófono para comenzar, hablar con normalidad y tocarlo nuevamente para enviar, o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con la voz **Marin** de OpenAI y utiliza **Android TextToSpeech** cuando no hay conexión.
+Después de detectar un equipo, el usuario puede tocar el micrófono para comenzar, hablar con normalidad y tocarlo nuevamente para enviar, o escribir una pregunta. La aplicación fija el último equipo detectado como contexto, mantiene la vista previa de la cámara activa y pausa únicamente el análisis mientras responde. Recupera su manual local y construye un prompt restringido para la **OpenAI Responses API**. La respuesta es breve, técnica y conversacional; se reproduce con la voz **Marin** de OpenAI y utiliza **Android TextToSpeech** cuando no hay conexión.
 
-La aplicación también conserva fichas técnicas, manuales, consultas básicas y favoritos de forma local para seguir siendo útil sin internet.
+La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles compactos para no ocultar la cámara. La aplicación conserva fichas técnicas, manuales, consultas, recientes, favoritos y correcciones voluntarias de detección de forma local para seguir siendo útil sin internet.
 
 ## <img src="https://api.iconify.design/tabler/school.svg?color=%2379bc35" width="20" valign="middle"/> Datos académicos
 
@@ -55,31 +55,38 @@ La aplicación también conserva fichas técnicas, manuales, consultas básicas 
 | **Android SDK 34** | Plataforma móvil; compatibilidad desde Android 8.0, API 26. |
 | **Gradle Kotlin DSL + JDK 17** | Compilación, configuración y dependencias. |
 | **CameraX** | Vista previa, ciclo de vida de la cámara y captura periódica de fotogramas. |
-| **Ultralytics YOLO26n** | Modelo entrenado para reconocer los 25 equipos. |
+| **Ultralytics YOLO11s** | Modelo entrenado para reconocer los 25 equipos. |
 | **Python + PyTorch + CUDA** | Entrenamiento y evaluación acelerados localmente con la GPU NVIDIA. |
 | **Roboflow / formato YOLO** | Organización, revisión y exportación inicial del dataset etiquetado. |
-| **ONNX Runtime Android** | Inferencia del modelo dentro del celular, sin enviar imágenes a servidores. |
-| **Material Design 3** | Interfaz moderna, accesible y con tema oscuro verde institucional. |
+| **TensorFlow Lite + XNNPACK** | Inferencia acelerada del modelo dentro del celular, sin enviar imágenes a servidores. |
+| **Material Design 3** | Interfaz moderna, compacta y accesible, con modo oscuro fijo y verde institucional UTEQ. |
 | **Navigation Component** | Navegación entre cámara y ficha del equipo. |
 | **MVVM + LiveData + Coroutines** | Separación de interfaz, estado, detección y consultas asíncronas. |
-| **OpenAI Responses API** | Generación de respuestas técnicas con el manual del equipo como contexto. |
-| **OpenAI Web Search** | Complemento técnico opcional cuando el manual no cubre una información general. |
+| **OpenAI Responses API + File Search** | Recupera primero la sección de características, operación, seguridad o mantenimiento asociada únicamente al equipo detectado. |
+| **OpenAI Web Search** | Se activa solo si el manual no contiene la respuesta; la app lo comunica naturalmente antes de complementar la información. |
 | **OpenAI Audio Speech** | Voz neuronal **Marin** para leer las respuestas naturalmente. |
 | **Android SpeechRecognizer** | Conversión de la pregunta hablada a texto en español de Ecuador, con vocabulario de laboratorio. |
 | **Android TextToSpeech** | Voz de respaldo cuando OpenAI o internet no están disponibles. |
-| **JSON local + SharedPreferences** | Catálogo, manuales, características y favoritos offline. |
+| **JSON local + SharedPreferences** | Catálogo, manuales, características, favoritos, recientes, historial y retroalimentación local. |
 
 ## <img src="https://api.iconify.design/tabler/trophy.svg?color=%23facc15" width="20" valign="middle"/> Funcionalidades
 
 - <img src="https://api.iconify.design/tabler/video.svg?color=%2335d05b" width="16" valign="middle"/> Detección de equipos en tiempo real con cuadros delimitadores.
-- <img src="https://api.iconify.design/tabler/device-mobile.svg?color=%2379bc35" width="16" valign="middle"/> Inferencia YOLO completamente local mediante ONNX Runtime.
+- <img src="https://api.iconify.design/tabler/device-mobile.svg?color=%2379bc35" width="16" valign="middle"/> Inferencia YOLO completamente local mediante TensorFlow Lite.
 - <img src="https://api.iconify.design/tabler/zoom-in.svg?color=%2335d05b" width="16" valign="middle"/> Segunda pasada automática sobre el centro de la imagen para mejorar detecciones lejanas.
 - <img src="https://api.iconify.design/tabler/percentage.svg?color=%23f472b6" width="16" valign="middle"/> Porcentaje de confianza y detección simultánea de varios equipos.
+- <img src="https://api.iconify.design/tabler/layout-dashboard.svg?color=%2335d05b" width="16" valign="middle"/> Cámara protagonista, tarjeta compacta de detección y controles flotantes que no cubren la vista.
 - <img src="https://api.iconify.design/tabler/microphone.svg?color=%23ef4444" width="16" valign="middle"/> Un toque para comenzar a escuchar y otro para enviar la pregunta.
+- <img src="https://api.iconify.design/tabler/wave-sine.svg?color=%2335d05b" width="16" valign="middle"/> Estados visuales y animaciones ligeras al escuchar, procesar y responder.
 - <img src="https://api.iconify.design/tabler/message-chatbot.svg?color=%23fb923c" width="16" valign="middle"/> Preguntas por voz o texto con contexto documental del equipo detectado.
+- <img src="https://api.iconify.design/tabler/files.svg?color=%23a78bfa" width="16" valign="middle"/> Índices File Search aislados por equipo; cada manual se consulta por bloques de características, operación, seguridad o mantenimiento/problemas, mientras el PDF completo queda en Storage.
+- <img src="https://api.iconify.design/tabler/message-circle-2.svg?color=%23facc15" width="16" valign="middle"/> Contexto breve de conversación por equipo para responder de forma natural sin guardar diálogos en el teléfono.
 - <img src="https://api.iconify.design/tabler/volume.svg?color=%2379bc35" width="16" valign="middle"/> Lectura natural con OpenAI Marin y respaldo con Android TTS.
 - <img src="https://api.iconify.design/tabler/file-description.svg?color=%23a78bfa" width="16" valign="middle"/> Fichas, características y manuales disponibles offline.
+- <img src="https://api.iconify.design/tabler/bolt.svg?color=%2335d05b" width="16" valign="middle"/> Acciones rápidas offline para consultar función, preparación, seguridad y cierre sin leer un bloque largo.
 - <img src="https://api.iconify.design/tabler/star.svg?color=%23facc15" width="16" valign="middle"/> Equipos favoritos guardados localmente.
+- <img src="https://api.iconify.design/tabler/history.svg?color=%2379bc35" width="16" valign="middle"/> Historial reciente por equipo y consultas guardadas en el dispositivo.
+- <img src="https://api.iconify.design/tabler/checkbox.svg?color=%2335d05b" width="16" valign="middle"/> Confirmación o corrección voluntaria de detecciones; la evidencia queda local y nunca se envía automáticamente.
 - <img src="https://api.iconify.design/tabler/shield-check.svg?color=%23ef4444" width="16" valign="middle"/> El asistente rechaza preguntas ajenas al equipo enfocado y evita inventar procedimientos peligrosos.
 
 ## <img src="https://api.iconify.design/tabler/arrows-exchange.svg?color=%2335d05b" width="20" valign="middle"/> Flujo de funcionamiento
@@ -87,7 +94,7 @@ La aplicación también conserva fichas técnicas, manuales, consultas básicas 
 ```mermaid
 flowchart TD
     A[CameraX captura un fotograma] --> B[Preprocesamiento 640x640 RGB]
-    B --> C[YOLO26n + ONNX Runtime en el celular]
+    B --> C[YOLO11s + TensorFlow Lite en el celular]
     C --> D[Clase, confianza y cuadro de detección]
     D --> E[Se fija el equipo al iniciar la pregunta]
     E --> F{Entrada del usuario}
@@ -107,34 +114,29 @@ flowchart TD
 ### ¿Cómo se conecta la IA?
 
 1. **CameraX** entrega una imagen de la cámara a la aplicación.
-2. **YOLO26n** identifica el equipo en el propio celular; la fotografía no se envía a OpenAI.
-3. Con el primer toque al micrófono, la app congela lógicamente el último equipo detectado y pausa el análisis YOLO; con el segundo toque termina el dictado y procesa la pregunta.
+2. **YOLO11s** identifica el equipo en el propio celular; la fotografía no se envía a OpenAI.
+3. Con el primer toque al micrófono, la app fija el último equipo detectado y pausa únicamente el análisis YOLO; la cámara continúa mostrando su vista previa. Con el segundo toque termina el dictado y procesa la pregunta.
 4. **Android SpeechRecognizer** convierte la voz a texto, prioriza español de Ecuador, nombres de equipos y términos del laboratorio.
-5. La aplicación recupera de `manual_text.json` el contenido correspondiente al equipo.
-6. Se construye un prompt con tres partes: reglas del asistente, pregunta transcrita y contenido del manual.
-7. La **Responses API** recibe ese contexto. Debe responder únicamente sobre el equipo, en lenguaje natural, entre dos y cuatro oraciones; si la pregunta no corresponde, la rechaza.
+5. La aplicación obtiene de `document_index.json` el ID del vector store asignado al equipo, sin usar una base de datos externa.
+6. **File Search** busca en cuatro secciones breves de ese único equipo —características, operación, seguridad y mantenimiento/problemas— y recupera solo las relevantes; los PDFs completos permanecen como respaldo en Storage.
+7. Se construye un prompt con reglas del asistente, pregunta transcrita, resumen local y las secciones recuperadas. La **Responses API** responde únicamente sobre el equipo, en lenguaje natural; si la pregunta no corresponde, la rechaza. Si el manual no cubre la consulta, recién entonces realiza una búsqueda web técnica y avisa que complementa la respuesta con internet.
 8. El texto se envía a **OpenAI Audio Speech** y se reproduce con la voz **Marin**. Si falla la conexión, se utiliza el contenido y la voz offline de Android.
 
-> Este enfoque es un **RAG documental ligero**: la recuperación del documento ocurre localmente y el fragmento completo del manual correspondiente se inserta como contexto. No depende de un vector store ni de File Search.
+> Este enfoque es un **RAG documental híbrido**: el catálogo de IDs se incluye en la APK, pero File Search recupera solo las secciones necesarias desde el vector store del equipo. No se expone ni se consulta documentación de otros equipos.
 
 ## <img src="https://api.iconify.design/tabler/chart-dots.svg?color=%2379bc35" width="20" valign="middle"/> Modelo de detección
 
 | Propiedad | Valor |
 |---|---:|
-| Modelo | Ultralytics YOLO26n |
-| Formato móvil | ONNX |
-| Entrada | `1 × 3 × 640 × 640`, RGB normalizado entre 0 y 1 |
+| Modelo | Ultralytics YOLO11s |
+| Formato móvil | TensorFlow Lite (`.tflite`) |
+| Entrada | `1 × 640 × 640 × 3`, RGB normalizado entre 0 y 1 |
 | Clases | 25 |
-| Imágenes de prueba independientes | 278 |
-| Instancias de prueba | 287 |
-| Precisión | 92.22 % |
-| Recall | 90.68 % |
-| mAP50 | 93.46 % |
-| mAP50–95 | 89.41 % |
-| Mejor época | 35 |
 | Ultralytics | 8.4.138 |
 
-El detector aplica *letterbox*, normalización NCHW, umbral de confianza del 25 %, NMS embebido y una segunda inferencia sobre un recorte central cuando la primera detección no supera el 60 %.
+El detector aplica *letterbox*, normalización NHWC, umbral de confianza del 80 % y NMS local. Además, una etiqueta debe repetirse en dos capturas consecutivas en la misma zona antes de mostrarse. Si una pasada completa no encuentra un equipo, realiza una segunda pasada sobre el centro para mejorar la detección a distancia. Las métricas comparables del nuevo entrenamiento deben incorporarse cuando se disponga de su evaluación de validación o prueba.
+
+> **Cobertura real del archivo actual:** el entrenamiento incluye la clase **Calentador** y no incluye **Extractor de grasa**. LabDetect no remapea una clase por otra; el calentador se muestra con su etiqueta real y permanece con documentación pendiente hasta recibir su manual.
 
 ## <img src="https://api.iconify.design/tabler/wifi-off.svg?color=%23facc15" width="20" valign="middle"/> Funcionamiento offline y online
 
@@ -145,6 +147,8 @@ El detector aplica *letterbox*, normalización NCHW, umbral de confianza del 25 
 | Ficha y características | ✅ | ✅ |
 | Manual local | ✅ | ✅ |
 | Favoritos | ✅ | ✅ |
+| Acciones rápidas, guía e historial local | ✅ | ✅ |
+| Recientes y correcciones voluntarias | ✅ | ✅ |
 | Preguntas básicas sobre el manual | ✅ | ✅ |
 | Respuesta generativa con OpenAI | — | ✅ |
 | Búsqueda web técnica controlada | — | ✅ |
@@ -159,11 +163,12 @@ LabDetect/
 │   └── src/main/
 │       ├── assets/
 │       │   ├── equipment_catalog.json          Catálogo y variantes
+│       │   ├── document_index.json              IDs de File Search por equipo
 │       │   ├── manual_text.json                Contenido documental offline
-│       │   ├── labdetect_yolo26n.onnx          Modelo de detección
-│       │   └── labdetect_yolo26n.metadata.json Clases, entrada y métricas
+│       │   ├── labdetect_yolo11s.tflite         Modelo de detección
+│       │   └── labdetect_yolo11s.metadata.json  Clases, entrada y auditoría
 │       ├── java/com/example/labdetect/
-│       │   ├── data/                            ONNX, catálogo, manuales y OpenAI
+│       │   ├── data/                            TensorFlow Lite, catálogo, manuales y OpenAI
 │       │   ├── domain/                          Entidades y contratos
 │       │   ├── speech/                          OpenAI TTS y Android TTS
 │       │   ├── viewmodel/                       Estado y lógica MVVM
@@ -217,7 +222,7 @@ Conecta un teléfono, concede permisos de cámara y micrófono y ejecuta el mód
 ## <img src="https://api.iconify.design/tabler/lock.svg?color=%23ef4444" width="20" valign="middle"/> Privacidad y alcance
 
 - Las imágenes de la cámara se procesan localmente y no se envían a OpenAI.
-- En el modo online se envían la pregunta, el nombre del equipo y el texto de su manual para generar la respuesta.
+- En el modo online se envían la pregunta, el nombre del equipo y un resumen local corto; File Search recupera de forma remota únicamente los fragmentos pertinentes del manual asignado.
 - El reconocimiento de voz depende del proveedor de reconocimiento configurado en Android y puede usar internet.
 - La búsqueda web está disponible únicamente como apoyo técnico; el manual local sigue siendo la fuente principal.
 - El asistente está restringido al equipo enfocado y no debe responder temas ajenos.

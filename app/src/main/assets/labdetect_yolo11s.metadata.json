@@ -1,0 +1,42 @@
+{
+  "model": "labdetect_yolo11s.tflite",
+  "format": "tflite",
+  "input_size": 640,
+  "input_layout": "NHWC",
+  "color_order": "RGB",
+  "normalization": "0..1",
+  "nms_embedded": false,
+  "source_metadata": {
+    "architecture": "Ultralytics YOLO11s",
+    "ultralytics_version": "8.4.138",
+    "exported_at": "2026-09-04T18:08:15.253644+00:00",
+    "sha256": "5cb13f44c8c1900567f2065d9c73e21f6be0ab092fdb6c0b5ca8e6e3e495e435"
+  },
+  "classes": [
+    {"id":"agitador_calentador","label":"Agitador calentador"},
+    {"id":"autoclave","label":"Autoclave"},
+    {"id":"balanza_analitica","label":"Balanza analítica"},
+    {"id":"bano_maria","label":"Baño María"},
+    {"id":"bloque_digestor","label":"Bloque digestor"},
+    {"id":"bomba_vacio","label":"Bomba de vacío"},
+    {"id":"cabina_flujo_laminar","label":"Cabina de flujo laminar"},
+    {"id":"sorbona_cabina_extraccion_gases","label":"Cabina de extracción de gases"},
+    {"id":"calentador","label":"Calentador"},
+    {"id":"calorimetro","label":"Calorímetro"},
+    {"id":"centrifuga","label":"Centrífuga"},
+    {"id":"contador_colonias","label":"Contador de colonias"},
+    {"id":"desecador","label":"Desecador"},
+    {"id":"desmineralizador_agua","label":"Desmineralizador de agua"},
+    {"id":"destilador_agua","label":"Destilador de agua"},
+    {"id":"destilador_proteina","label":"Destilador de proteína"},
+    {"id":"estufa","label":"Estufa"},
+    {"id":"extractor_fibra","label":"Extractor de fibra"},
+    {"id":"incubadora","label":"Incubadora"},
+    {"id":"manta_calentamiento","label":"Manta de calentamiento"},
+    {"id":"molino_pulverizador","label":"Molino pulverizador"},
+    {"id":"mufla","label":"Mufla"},
+    {"id":"phmetro","label":"pHmetro"},
+    {"id":"refractometro","label":"Refractómetro"},
+    {"id":"viscosimetro","label":"Viscosímetro"}
+  ]
+}
