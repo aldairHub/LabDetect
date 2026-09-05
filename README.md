@@ -138,7 +138,7 @@ flowchart TD
 | Clases | 25 |
 | Ultralytics | 8.4.138 |
 
-El detector aplica *letterbox*, normalización NCHW y NMS local. Conserva candidatos desde 25 % para poder ampliar el centro cada tres análisis cuando el equipo está lejos; muestra al instante una señal desde 85 % y confirma en dos capturas consecutivas las señales entre 65 % y 84 %. Dos ausencias seguidas limpian la detección. Así mejora la respuesta sin aceptar falsos positivos débiles. Las métricas comparables del nuevo entrenamiento deben incorporarse cuando se disponga de su evaluación de validación o prueba.
+El detector aplica *letterbox*, normalización NCHW y NMS local. Conserva candidatos desde 25 % para poder ampliar el centro cada tres análisis cuando el equipo está lejos; muestra al instante una señal desde 85 %, confirma en dos capturas consecutivas las señales entre 65 % y 84 %, y exige tres capturas consecutivas para la franja de 45 % a 64 %. Dos ausencias seguidas limpian la detección. Así mejora la respuesta sin aceptar falsos positivos débiles. Las métricas comparables del nuevo entrenamiento deben incorporarse cuando se disponga de su evaluación de validación o prueba.
 
 > **Cobertura real del archivo actual:** el entrenamiento incluye la clase **Calentador** y no incluye **Extractor de grasa**. LabDetect no remapea una clase por otra; el calentador se muestra con su etiqueta real y permanece con documentación pendiente hasta recibir su manual.
 

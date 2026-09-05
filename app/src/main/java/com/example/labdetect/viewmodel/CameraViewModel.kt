@@ -28,6 +28,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private var consecutiveMisses = 0
     private var analyzedFrames = 0
     private var previousFrameDetections: List<Detection> = emptyList()
+    private var twoFramesAgoDetections: List<Detection> = emptyList()
     @Volatile private var lastDetectedResult: ClassificationResult? = null
     @Volatile private var conversationTarget: ClassificationResult? = null
     private var assistantJob: Job? = null
@@ -70,8 +71,15 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                             (candidate.confidence >= MIN_CONFIRMED_CONFIDENCE &&
                                 previousFrameDetections.any { previous ->
                                     isSameEquipment(candidate, previous)
+                                }) ||
+                            (candidate.confidence >= MIN_STABLE_LOW_CONFIDENCE &&
+                                previousFrameDetections.any { previous ->
+                                    isSameEquipment(candidate, previous)
+                                } && twoFramesAgoDetections.any { older ->
+                                    isSameEquipment(candidate, older)
                                 })
                     }
+                    twoFramesAgoDetections = previousFrameDetections
                     previousFrameDetections = candidates
 
                     // Cada cuadro visible debe persistir en dos capturas consecutivas y en
@@ -86,6 +94,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         _classificationResult.postValue(detected)
                     }
                 } else {
+                    twoFramesAgoDetections = previousFrameDetections
                     previousFrameDetections = emptyList()
                     if (++consecutiveMisses >= MISSES_BEFORE_CLEAR && conversationTarget == null) {
                         _detections.postValue(emptyList())
@@ -166,9 +175,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         // Dos ausencias seguidas quitan inmediatamente una detección que ya salió de
         // cámara, sin provocar parpadeos por una imagen borrosa aislada.
         private const val MISSES_BEFORE_CLEAR = 2
-        private const val MIN_CANDIDATE_CONFIDENCE = 50f
+        private const val MIN_CANDIDATE_CONFIDENCE = 45f
         private const val MIN_CONFIRMED_CONFIDENCE = 65f
         private const val MIN_INSTANT_CONFIDENCE = 85f
+        private const val MIN_STABLE_LOW_CONFIDENCE = 45f
         private const val STABLE_BOX_IOU = 0.50f
         private const val CENTER_CROP_EVERY_N_FRAMES = 3
     }
