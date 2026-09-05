@@ -138,7 +138,7 @@ flowchart TD
 | Clases | 25 |
 | Ultralytics | 8.4.138 |
 
-El detector aplica *letterbox*, normalización NHWC, umbral de confianza del 80 % y NMS local. Además, una etiqueta debe repetirse en dos capturas consecutivas en la misma zona antes de mostrarse. Si una pasada completa no encuentra un equipo, realiza una segunda pasada sobre el centro para mejorar la detección a distancia. Las métricas comparables del nuevo entrenamiento deben incorporarse cuando se disponga de su evaluación de validación o prueba.
+El detector aplica *letterbox*, normalización NHWC y NMS local. Conserva candidatos desde 25 % para poder ampliar el centro cuando el equipo está lejos; solo dibuja y fija un equipo desde 65 %, tras repetirlo en dos capturas consecutivas en la misma zona. Así mejora la detección a distancia sin aceptar falsos positivos débiles. Las métricas comparables del nuevo entrenamiento deben incorporarse cuando se disponga de su evaluación de validación o prueba.
 
 > **Cobertura real del archivo actual:** el entrenamiento incluye la clase **Calentador** y no incluye **Extractor de grasa**. LabDetect no remapea una clase por otra; el calentador se muestra con su etiqueta real y permanece con documentación pendiente hasta recibir su manual.
 

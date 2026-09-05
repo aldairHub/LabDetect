@@ -53,18 +53,22 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val results = detector.detect(bitmap)
                 if (analysisPaused.get()) return@launch
-                val candidates = results.filter { it.confidence >= MIN_DISPLAY_CONFIDENCE }
+                // Las señales medias solo sirven para comprobar estabilidad entre dos
+                // fotos. No se dibujan ni se usan para conversar hasta superar 65 %.
+                val candidates = results.filter { it.confidence >= MIN_CANDIDATE_CONFIDENCE }
                 if (candidates.isNotEmpty()) {
                     consecutiveMisses = 0
                     val confirmed = candidates.filter { candidate ->
-                        previousFrameDetections.any { previous ->
-                            isSameEquipment(candidate, previous)
-                        }
+                        candidate.confidence >= MIN_CONFIRMED_CONFIDENCE &&
+                            previousFrameDetections.any { previous ->
+                                isSameEquipment(candidate, previous)
+                            }
                     }
                     previousFrameDetections = candidates
 
-                    // Cada cuadro debe persistir en dos capturas consecutivas y en la misma
-                    // zona antes de aparecer. Así se admiten varios equipos sin falsos positivos fugaces.
+                    // Cada cuadro visible debe persistir en dos capturas consecutivas y en
+                    // la misma zona. Esto descarta falsos positivos débiles, pero permite
+                    // reconocer equipos antes de alcanzar el 80 %.
                     if (confirmed.isNotEmpty() && conversationTarget == null) {
                         _detections.postValue(confirmed)
                         val detected = confirmed.first().let {
@@ -153,7 +157,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     companion object {
         private const val MISSES_BEFORE_CLEAR = 3
-        private const val MIN_DISPLAY_CONFIDENCE = 80f
+        private const val MIN_CANDIDATE_CONFIDENCE = 50f
+        private const val MIN_CONFIRMED_CONFIDENCE = 65f
         private const val STABLE_BOX_IOU = 0.50f
     }
 }

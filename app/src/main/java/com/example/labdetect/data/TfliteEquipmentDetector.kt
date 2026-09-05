@@ -56,7 +56,10 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
 
     override fun detect(bitmap: Bitmap): List<Detection> {
         val fullFrame = detectFrame(bitmap)
-        if (fullFrame.isNotEmpty()) return fullFrame
+        // Una señal débil no debe impedir el acercamiento al centro. Así, un equipo
+        // lejano puede pasar de candidato a detección válida sin aceptar esa señal
+        // débil como una etiqueta visible.
+        if (fullFrame.any { it.confidence >= DIRECT_FRAME_CONFIDENCE }) return fullFrame
 
         // Si el equipo está pequeño, una única pasada ampliada ayuda sin duplicar la
         // inferencia normal de cada fotograma.
@@ -66,7 +69,7 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         val cropTop = (bitmap.height - cropHeight) / 2
         val crop = Bitmap.createBitmap(bitmap, cropLeft, cropTop, cropWidth, cropHeight)
         return try {
-            detectFrame(crop).map { detection ->
+            val enlarged = detectFrame(crop).map { detection ->
                 detection.copy(
                     left = (cropLeft + detection.left * cropWidth) / bitmap.width,
                     top = (cropTop + detection.top * cropHeight) / bitmap.height,
@@ -74,6 +77,7 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
                     bottom = (cropTop + detection.bottom * cropHeight) / bitmap.height
                 )
             }
+            nonMaxSuppression(fullFrame + enlarged)
         } finally {
             crop.recycle()
         }
@@ -272,9 +276,10 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         private const val METADATA_ASSET = "labdetect_yolo11s.metadata.json"
         private const val DEFAULT_INPUT_SIZE = 640
         private const val INFERENCE_THREADS = 4
-        // Solo se entregan detecciones que el modelo estima con 80 % o más.
-        // Es un filtro estricto para priorizar precisión sobre cantidad de etiquetas.
-        private const val CONFIDENCE_THRESHOLD = 0.80f
+        // Piso interno: conserva señales para confirmarlas entre fotogramas, pero la
+        // interfaz solo muestra las que superan un umbral mucho más alto en el ViewModel.
+        private const val CONFIDENCE_THRESHOLD = 0.25f
+        private const val DIRECT_FRAME_CONFIDENCE = 65f
         private const val NMS_IOU_THRESHOLD = 0.45f
         private const val CENTER_CROP_RATIO = 0.72f
         private const val MAX_DETECTIONS = 20
