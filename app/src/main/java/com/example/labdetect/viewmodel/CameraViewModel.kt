@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val detector = TfliteEquipmentDetector(application)
@@ -191,7 +192,22 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val currentArea = max(0f, current.right - current.left) * max(0f, current.bottom - current.top)
         val previousArea = max(0f, previous.right - previous.left) * max(0f, previous.bottom - previous.top)
         val union = currentArea + previousArea - intersection
-        return union > 0f && intersection / union >= STABLE_BOX_IOU
+        val overlap = if (union > 0f) intersection / union else 0f
+        if (overlap >= STABLE_BOX_IOU) return true
+
+        // Al grabar a pulso (especialmente frente a una pantalla), la caja puede
+        // desplazarse entre dos fotogramas aunque siga siendo el mismo aparato. La
+        // clase debe coincidir y los centros deben mantenerse cerca; no basta con
+        // reutilizar el nombre en cualquier parte de la imagen.
+        val currentCenterX = (current.left + current.right) / 2f
+        val currentCenterY = (current.top + current.bottom) / 2f
+        val previousCenterX = (previous.left + previous.right) / 2f
+        val previousCenterY = (previous.top + previous.bottom) / 2f
+        val centerDistance = sqrt(
+            (currentCenterX - previousCenterX) * (currentCenterX - previousCenterX) +
+                (currentCenterY - previousCenterY) * (currentCenterY - previousCenterY)
+        )
+        return centerDistance <= STABLE_CENTER_DISTANCE
     }
 
     private fun publishScannerStatus(value: String) {
@@ -208,7 +224,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         private const val MIN_CONFIRMED_CONFIDENCE = 65f
         private const val MIN_INSTANT_CONFIDENCE = 85f
         private const val MIN_STABLE_LOW_CONFIDENCE = 45f
-        private const val STABLE_BOX_IOU = 0.50f
+        private const val STABLE_BOX_IOU = 0.28f
+        private const val STABLE_CENTER_DISTANCE = 0.18f
         private const val CENTER_CROP_EVERY_N_FRAMES = 3
     }
 }
