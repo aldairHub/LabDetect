@@ -590,7 +590,12 @@ class CameraFragment : Fragment() {
             val now = SystemClock.elapsedRealtime()
             if (viewModel.isAnalysisPaused() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
             lastAnalysisAt = now
-            imageProxy.toUprightBitmap()?.let(viewModel::onImageCaptured)
+            imageProxy.toUprightBitmap()?.let { bitmap ->
+                mainHandler.post {
+                    _binding?.detectionOverlay?.setSourceFrameSize(bitmap.width, bitmap.height)
+                }
+                viewModel.onImageCaptured(bitmap)
+            }
         } finally {
             imageProxy.close()
         }

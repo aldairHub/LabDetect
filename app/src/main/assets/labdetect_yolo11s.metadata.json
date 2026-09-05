@@ -2,7 +2,7 @@
   "model": "labdetect_yolo11s.tflite",
   "format": "tflite",
   "input_size": 640,
-  "input_layout": "NHWC",
+  "input_layout": "NCHW",
   "color_order": "RGB",
   "normalization": "0..1",
   "nms_embedded": false,

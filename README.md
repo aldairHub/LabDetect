@@ -134,7 +134,7 @@ flowchart TD
 |---|---:|
 | Modelo | Ultralytics YOLO11s |
 | Formato móvil | TensorFlow Lite (`.tflite`) |
-| Entrada | `1 × 640 × 640 × 3`, RGB normalizado entre 0 y 1 |
+| Entrada | `1 × 3 × 640 × 640`, RGB normalizado entre 0 y 1 |
 | Clases | 25 |
 | Ultralytics | 8.4.138 |
 

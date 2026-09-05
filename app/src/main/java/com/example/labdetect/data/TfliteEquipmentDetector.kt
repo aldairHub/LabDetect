@@ -179,12 +179,21 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
 
             val centerX = value(0, candidate)
             val centerY = value(1, candidate)
+            // Este export de YOLO11 entrega xywh normalizado (0..1), no en píxeles
+            // 640x640. Antes se trataba como píxeles y, al quitar el letterbox, cada
+            // caja quedaba fuera del fotograma y se descartaba. Se conserva soporte
+            // para exports futuros que sí entreguen coordenadas en píxeles.
+            val coordinateScale = if (usesNormalizedCoordinates(centerX, centerY, width, height)) {
+                inputSize.toFloat()
+            } else {
+                1f
+            }
             val box = classes[classIndex]
             val detection = toDetection(
-                left = centerX - width / 2f,
-                top = centerY - height / 2f,
-                right = centerX + width / 2f,
-                bottom = centerY + height / 2f,
+                left = (centerX - width / 2f) * coordinateScale,
+                top = (centerY - height / 2f) * coordinateScale,
+                right = (centerX + width / 2f) * coordinateScale,
+                bottom = (centerY + height / 2f) * coordinateScale,
                 score = score,
                 equipment = box,
                 prepared = prepared,
@@ -195,6 +204,14 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         }
         return nonMaxSuppression(parsed)
     }
+
+    private fun usesNormalizedCoordinates(
+        centerX: Float,
+        centerY: Float,
+        width: Float,
+        height: Float
+    ): Boolean = centerX in 0f..1.5f && centerY in 0f..1.5f &&
+        width in 0f..1.5f && height in 0f..1.5f
 
     private fun toDetection(
         left: Float,
