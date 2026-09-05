@@ -6,7 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Bundle
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -20,6 +22,8 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
@@ -35,13 +39,16 @@ import com.example.labdetect.speech.AndroidSpeechEngine
 import com.example.labdetect.viewmodel.CameraViewModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class CameraFragment : Fragment() {
     private var _binding: FragmentCameraBinding? = null
     private val binding get() = _binding!!
 
-    private val classificationHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val classificationInterval = 1_000L
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val cameraAnalysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private var lastAnalysisAt = 0L
     private val viewModel: CameraViewModel by viewModels()
 
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -70,7 +77,6 @@ class CameraFragment : Fragment() {
     ) { permissions ->
         if (permissions[Manifest.permission.CAMERA] == true) {
             startCamera()
-            startPeriodicClassification()
         } else if (!cameraPermissionGranted()) {
             Toast.makeText(context, "Se necesita la cámara para detectar equipos", Toast.LENGTH_SHORT).show()
         }
@@ -102,7 +108,6 @@ class CameraFragment : Fragment() {
 
         if (cameraPermissionGranted()) {
             startCamera()
-            startPeriodicClassification()
         }
         binding.fabMic.isEnabled = true
         requestMissingPermissions()
@@ -307,7 +312,7 @@ class CameraFragment : Fragment() {
         binding.fabMic.setImageResource(R.drawable.ic_mic)
         binding.fabMic.animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
         runCatching { speechRecognizer.stopListening() }
-        classificationHandler.postDelayed({
+        mainHandler.postDelayed({
             if (_binding != null && voiceState == VoiceState.AWAITING_RESULT) {
                 if (partialTranscript.isNotBlank()) {
                     submitRecognizedQuestion(partialTranscript)
@@ -553,18 +558,6 @@ class CameraFragment : Fragment() {
             .show()
     }
 
-    private fun startPeriodicClassification() {
-        classificationHandler.postDelayed(object : Runnable {
-            override fun run() {
-                if (_binding == null) return
-                if (!viewModel.isAnalysisPaused()) {
-                    binding.viewFinder.bitmap?.let(viewModel::onImageCaptured)
-                }
-                classificationHandler.postDelayed(this, classificationInterval)
-            }
-        }, classificationInterval)
-    }
-
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
@@ -572,15 +565,54 @@ class CameraFragment : Fragment() {
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setTargetRotation(binding.viewFinder.display.rotation)
+                .build()
+                .also { useCase ->
+                    useCase.setAnalyzer(cameraAnalysisExecutor) { imageProxy ->
+                        analyzeCameraFrame(imageProxy)
+                    }
+                }
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
             } catch (exception: Exception) {
                 Log.e("CameraFragment", "No se pudo iniciar CameraX", exception)
                 Toast.makeText(context, "No pude iniciar la cámara.", Toast.LENGTH_SHORT).show()
             }
         }, ContextCompat.getMainExecutor(requireContext()))
     }
+
+    /** Analiza el fotograma original que entrega CameraX, no una captura de la vista previa. */
+    private fun analyzeCameraFrame(imageProxy: ImageProxy) {
+        try {
+            val now = SystemClock.elapsedRealtime()
+            if (viewModel.isAnalysisPaused() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
+            lastAnalysisAt = now
+            imageProxy.toUprightBitmap()?.let(viewModel::onImageCaptured)
+        } finally {
+            imageProxy.close()
+        }
+    }
+
+    private fun ImageProxy.toUprightBitmap(): Bitmap? = runCatching {
+        val source = toBitmap()
+        val degrees = imageInfo.rotationDegrees
+        if (degrees == 0) {
+            source
+        } else {
+            Bitmap.createBitmap(
+                source,
+                0,
+                0,
+                source.width,
+                source.height,
+                Matrix().apply { postRotate(degrees.toFloat()) },
+                true
+            ).also { source.recycle() }
+        }
+    }.getOrNull()
 
     private fun cameraPermissionGranted() = ContextCompat.checkSelfPermission(
         requireContext(),
@@ -593,7 +625,7 @@ class CameraFragment : Fragment() {
     ) == PackageManager.PERMISSION_GRANTED
 
     override fun onDestroyView() {
-        classificationHandler.removeCallbacksAndMessages(null)
+        mainHandler.removeCallbacksAndMessages(null)
         runCatching { speechRecognizer.cancel() }
         speechRecognizer.destroy()
         speechEngine.close()
@@ -602,7 +634,13 @@ class CameraFragment : Fragment() {
         super.onDestroyView()
     }
 
+    override fun onDestroy() {
+        cameraAnalysisExecutor.shutdownNow()
+        super.onDestroy()
+    }
+
     companion object {
         private const val RECOGNITION_RESULT_TIMEOUT_MS = 4_000L
+        private const val ANALYSIS_INTERVAL_MS = 500L
     }
 }

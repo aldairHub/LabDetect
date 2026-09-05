@@ -54,7 +54,7 @@ La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles c
 | **Kotlin** | Lenguaje principal de la aplicación. |
 | **Android SDK 34** | Plataforma móvil; compatibilidad desde Android 8.0, API 26. |
 | **Gradle Kotlin DSL + JDK 17** | Compilación, configuración y dependencias. |
-| **CameraX** | Vista previa, ciclo de vida de la cámara y captura periódica de fotogramas. |
+| **CameraX** | Vista previa, ciclo de vida de la cámara y análisis directo de fotogramas reales. |
 | **Ultralytics YOLO11s** | Modelo entrenado para reconocer los 25 equipos. |
 | **Python + PyTorch + CUDA** | Entrenamiento y evaluación acelerados localmente con la GPU NVIDIA. |
 | **Roboflow / formato YOLO** | Organización, revisión y exportación inicial del dataset etiquetado. |
@@ -94,7 +94,7 @@ La interfaz utiliza modo oscuro fijo y verde institucional UTEQ, con controles c
 
 ```mermaid
 flowchart TD
-    A[CameraX captura un fotograma] --> B[Preprocesamiento 640x640 RGB]
+    A[CameraX ImageAnalysis recibe un fotograma real] --> B[Preprocesamiento 640x640 RGB]
     B --> C[YOLO11s + TensorFlow Lite en el celular]
     C --> D[Clase, confianza y cuadro de detección]
     D --> E[Se fija el equipo al iniciar la pregunta]

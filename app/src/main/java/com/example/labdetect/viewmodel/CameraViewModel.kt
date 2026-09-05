@@ -47,8 +47,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val assistantLoading: LiveData<Boolean> = _assistantLoading
 
     fun onImageCaptured(bitmap: Bitmap) {
-        if (analysisPaused.get()) return
-        if (!inferenceRunning.compareAndSet(false, true)) return
+        if (analysisPaused.get() || !inferenceRunning.compareAndSet(false, true)) {
+            if (!bitmap.isRecycled) bitmap.recycle()
+            return
+        }
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 val results = detector.detect(bitmap)
@@ -88,6 +90,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             } finally {
+                if (!bitmap.isRecycled) bitmap.recycle()
                 inferenceRunning.set(false)
             }
         }
