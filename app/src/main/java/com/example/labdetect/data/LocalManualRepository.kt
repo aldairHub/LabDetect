@@ -85,7 +85,9 @@ class LocalManualRepository(context: Context) {
                 manual.specifications
             else -> manual.function
         }
-        val answer = naturalSpeech(selected, 70)
+        // La burbuja está diseñada para una respuesta breve que se pueda leer y oír
+        // sin cortar la última frase cuando no hay conexión.
+        val answer = naturalSpeech(selected, 26)
         return answer.ifBlank {
             "${manual.displayName} está documentado en el manual guardado. Puedes abrirlo desde los detalles del equipo."
         }
