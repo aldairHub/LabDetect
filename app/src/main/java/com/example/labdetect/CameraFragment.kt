@@ -13,6 +13,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.util.Size
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
@@ -566,6 +567,9 @@ class CameraFragment : Fragment() {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
             val analysis = ImageAnalysis.Builder()
+                // YOLO recibe 640 px; pedir a CameraX una salida cercana evita convertir
+                // fotos de varios megapíxeles para luego reducirlas al mismo tamaño.
+                .setTargetResolution(Size(640, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setTargetRotation(binding.viewFinder.display.rotation)
                 .build()
@@ -646,6 +650,6 @@ class CameraFragment : Fragment() {
 
     companion object {
         private const val RECOGNITION_RESULT_TIMEOUT_MS = 4_000L
-        private const val ANALYSIS_INTERVAL_MS = 500L
+        private const val ANALYSIS_INTERVAL_MS = 250L
     }
 }

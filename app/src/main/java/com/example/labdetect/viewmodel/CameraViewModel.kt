@@ -26,6 +26,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val inferenceRunning = AtomicBoolean(false)
     private val analysisPaused = AtomicBoolean(false)
     private var consecutiveMisses = 0
+    private var analyzedFrames = 0
     private var previousFrameDetections: List<Detection> = emptyList()
     @Volatile private var lastDetectedResult: ClassificationResult? = null
     @Volatile private var conversationTarget: ClassificationResult? = null
@@ -53,7 +54,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch(Dispatchers.Default) {
             try {
-                val results = detector.detect(bitmap)
+                // La ampliación central es útil para equipos lejanos, pero cuesta una
+                // segunda inferencia completa. Se hace cada tres análisis, no en cada
+                // fotograma sin detección; el objeto cercano sigue apareciendo enseguida.
+                val allowCenterCrop = ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
+                val results = detector.detect(bitmap, allowCenterCrop)
                 if (analysisPaused.get()) return@launch
                 // Las señales medias solo sirven para comprobar estabilidad entre dos
                 // fotos. No se dibujan ni se usan para conversar hasta superar 65 %.
@@ -61,10 +66,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 if (candidates.isNotEmpty()) {
                     consecutiveMisses = 0
                     val confirmed = candidates.filter { candidate ->
-                        candidate.confidence >= MIN_CONFIRMED_CONFIDENCE &&
-                            previousFrameDetections.any { previous ->
-                                isSameEquipment(candidate, previous)
-                            }
+                        candidate.confidence >= MIN_INSTANT_CONFIDENCE ||
+                            (candidate.confidence >= MIN_CONFIRMED_CONFIDENCE &&
+                                previousFrameDetections.any { previous ->
+                                    isSameEquipment(candidate, previous)
+                                })
                     }
                     previousFrameDetections = candidates
 
@@ -78,15 +84,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         lastDetectedResult = detected
                         _classificationResult.postValue(detected)
-                    } else if (conversationTarget == null) {
-                        _detections.postValue(emptyList())
-                        _classificationResult.postValue(null)
                     }
                 } else {
                     previousFrameDetections = emptyList()
                     if (++consecutiveMisses >= MISSES_BEFORE_CLEAR && conversationTarget == null) {
                         _detections.postValue(emptyList())
                         _classificationResult.postValue(null)
+                        lastDetectedResult = null
                     }
                 }
             } finally {
@@ -159,9 +163,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     companion object {
-        private const val MISSES_BEFORE_CLEAR = 3
+        // Dos ausencias seguidas quitan inmediatamente una detección que ya salió de
+        // cámara, sin provocar parpadeos por una imagen borrosa aislada.
+        private const val MISSES_BEFORE_CLEAR = 2
         private const val MIN_CANDIDATE_CONFIDENCE = 50f
         private const val MIN_CONFIRMED_CONFIDENCE = 65f
+        private const val MIN_INSTANT_CONFIDENCE = 85f
         private const val STABLE_BOX_IOU = 0.50f
+        private const val CENTER_CROP_EVERY_N_FRAMES = 3
     }
 }

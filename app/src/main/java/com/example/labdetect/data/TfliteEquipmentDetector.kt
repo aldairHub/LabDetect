@@ -54,12 +54,12 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         outputShape = created?.getOutputTensor(0)?.shape() ?: intArrayOf()
     }
 
-    override fun detect(bitmap: Bitmap): List<Detection> {
+    override fun detect(bitmap: Bitmap, allowCenterCrop: Boolean): List<Detection> {
         val fullFrame = detectFrame(bitmap)
         // Una señal débil no debe impedir el acercamiento al centro. Así, un equipo
         // lejano puede pasar de candidato a detección válida sin aceptar esa señal
         // débil como una etiqueta visible.
-        if (fullFrame.any { it.confidence >= DIRECT_FRAME_CONFIDENCE }) return fullFrame
+        if (!allowCenterCrop || fullFrame.any { it.confidence >= DIRECT_FRAME_CONFIDENCE }) return fullFrame
 
         // Si el equipo está pequeño, una única pasada ampliada ayuda sin duplicar la
         // inferencia normal de cada fotograma.

@@ -4,5 +4,6 @@ import android.graphics.Bitmap
 import java.io.Closeable
 
 interface EquipmentDetector : Closeable {
-    fun detect(bitmap: Bitmap): List<Detection>
+    /** `allowCenterCrop` evita una segunda inferencia en todos los fotogramas. */
+    fun detect(bitmap: Bitmap, allowCenterCrop: Boolean): List<Detection>
 }
