@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "source": "manuales1.zip",
+  "source": "manuales1.zip + manuales2.zip",
   "document_scope": "general_reference",
-  "warning": "Los documentos indican que son referencias generales; no sustituyen el manual exacto del modelo.",
+  "warning": "Los documentos son referencias generales; no sustituyen el manual exacto del modelo.",
   "equipment": {
     "agitador_calentador": {
       "display_name": "Agitador calentador",
@@ -380,6 +380,387 @@
           "pages": "6-6"
         }
       ]
+    },
+    "destilador_agua": {
+      "display_name": "Destilador de agua",
+      "vector_store_id": "vs_6a9b5b18caac8191b75fc7078707f59b",
+      "full_file_id": "file-LQDWfSMrvkNw1Y8bRT3222",
+      "sha256": "0236021396f2e187002a6a60394dd428ddd7723601cd6804accdf19a5cf38cf4",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-7zcUhYf3mjCRtUEfRvH2Pz",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-2BEA81B3jgejY2AFpwiq9K",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-9uRaNiUNhtN2QP4o2GEnEe",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-VNiGhwN6XNTe4gfn99Czpd",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "destilador_proteina": {
+      "display_name": "Destilador de proteína",
+      "vector_store_id": "vs_6a9b5b3f37748191bc3e96650ba007d6",
+      "full_file_id": "file-FPRHUfgwjZXypLVKjYVh8U",
+      "sha256": "f7cb4f73ffc9ccdec28984b80307c208d92ec87ab68dfb04d85de2dce0838958",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-BPa9AoQDBnK7weajVmRHjS",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-F5n3735VQkR7ffg8YaiwR8",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-4BTtpPeTa13e27qP3n5Zn3",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-4H46D93RYNpcopk34oMtyT",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "estufa": {
+      "display_name": "Estufa",
+      "vector_store_id": "vs_6a9b5b5d3a988191abb44bc0440dc7d6",
+      "full_file_id": "file-6x1JfsR8dZmvz2ypvJAfM7",
+      "sha256": "8b420c8b16962af503e55541c3c03280be2187fa9df181b3e432f8436b09ecac",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-KJzXw5UugVzjzDze1w3A1u",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-GUz1tXkYP7FTbMwKqLbDqG",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-C9zautvgc1JZ32q4hbjsBi",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-H8zdhTStyzpEUMKH7coLzP",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "extractor_fibra": {
+      "display_name": "Extractor de fibra",
+      "vector_store_id": "vs_6a9b5b83f14c8191ae1da4c1619bef23",
+      "full_file_id": "file-JSjfeyUmneweAhDQKn7E6s",
+      "sha256": "4ef9bc4bbe967b0a89b7eed3bcfc89b6b459fcc9963d734a6c0920f6320677b6",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-DGVicPyMJkENXGL3EF4NY8",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-594vV323EUf3sf6TdXCDSR",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-Xgudkbi6MfSTG6epXvcHXf",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-JYqP78ZJWH9aNPvB46Z5iB",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "extractor_grasa": {
+      "display_name": "Extractor de grasa",
+      "vector_store_id": "vs_6a9b5bb37c20819181c9eac07aa5a12f",
+      "full_file_id": "file-62uBqBBhzi1JXWHf65Zbe9",
+      "sha256": "79ba49beb785edfb5692197e80da77119618206b343701db9d6396e7a9ed57e2",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-Hx7znfSgF1ab3D3Zbw77PZ",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-BNtSbt8hbXDjao1cRMzJuD",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-5m2nPhEoYtkyyPYnXYrv5r",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-Wrxtnh5jp5HrWbHf8pV3Tr",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "incubadora": {
+      "display_name": "Incubadora",
+      "vector_store_id": "vs_6a9b5bd703e88191a828db3c33e943c5",
+      "full_file_id": "file-D8Sc6Gwe95Hrp5pWRDwyu5",
+      "sha256": "3f49a4bc4486362f4e4a71a35511f231aa778a51c0f8deadfb5a8b8508b3bd48",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-8BMMowXRYJAqUzXCHMkMZM",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-2cBes2GANebBqHF5bprGv3",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-JXVrNVgxQC9TMZZtkRaS8s",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-8UAocs8GGajtPzDyCYbQ12",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "manta_calentamiento": {
+      "display_name": "Manta de calentamiento",
+      "vector_store_id": "vs_6a9b5d1e43248191a862afa23c58c23c",
+      "full_file_id": "file-UY62hQWzqYF7whyMWjMunw",
+      "sha256": "9853322cb0d574259a072177efba5c07de68df7a22e833dc3544b739bc65a76e",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-21DpHyw4HvYPwH5H9apfTE",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-2tvWYMPqCbuuonFc1RVW5F",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-Jf4W1HSYyJ5nJ4JZNmGWem",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-7nuk5vgUfEZFxW9L2pLV9J",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "molino_pulverizador": {
+      "display_name": "Molino pulverizador",
+      "vector_store_id": "vs_6a9b5d3f45648191986f19953ce3d9e4",
+      "full_file_id": "file-PDuUBYR22XaHAiqBDn8HJ1",
+      "sha256": "a6623b86c48e59e96871a0b254cd61e47cd4fcfffbc6b6ba898f808d740397a3",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-1edx4rtED61h5Lv5fdfmLF",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-MVmCCw9N4d6vH5B4q9MWJf",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-MvBZZhzajRuPYoiBcX2NZh",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-DnTCxC7XGgTB5f494f8nMg",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "mufla": {
+      "display_name": "Mufla",
+      "vector_store_id": "vs_6a9b5d5afa18819194a7fecbb88382bf",
+      "full_file_id": "file-3Uh3TPZqfhGKjyBPTZcFYU",
+      "sha256": "caa0241457964f25690151d666a4a7795b23b04111ad94984f292f7a382c7fef",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-C3SZCzvMHEUzv4t2RCqz6e",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-4m2xseAMcHitQBFdbGKU8x",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-Dvo7LsWDeqYPNEhBugUf7G",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-HnrQjDw7u4JoKVsJqpNFkp",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "phmetro": {
+      "display_name": "pHmetro",
+      "vector_store_id": "vs_6a9b5d82ac8481919d316ca7b65969f1",
+      "full_file_id": "file-RS9B3kBXmVWW9bUGCLFoJc",
+      "sha256": "f91bfb960cefbaef310ba2c908c3101cca2c0d859b7632a2f59e2dfc3f43ef13",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-NyYhSWXe5MHnAVizWPegYT",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-Wo79jXvFigF6L2fBcRWPM3",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-G7Y2nwHwxKhMnve3rW7Tes",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-PuuPKnjkEcBrcicFGQBaEY",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "refractometro": {
+      "display_name": "Refractómetro",
+      "vector_store_id": "vs_6a9b5dab43f8819180044ca08fa726d8",
+      "full_file_id": "file-UyZgueNFvrN8cFXKYfb1Yi",
+      "sha256": "c052eb45bb98ef8e67a0432edea9838a48ee79c3ea8ab56e53d8f74f27ea4329",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-QjkVPjX5niJqLb8uBEqTnw",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-W2d1j5muBTxL8dzSnh3Dsm",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-EisG3bsqFzveYzHSi5zenc",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-S9MDJKCdjThXRXanG46nDn",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "sorbona_cabina_extraccion_gases": {
+      "display_name": "Sorbona / cabina de extracción de gases",
+      "vector_store_id": "vs_6a9b5dd742488191981b1f4b3011eb14",
+      "full_file_id": "file-YahGxuCaT3eLe41brdaHdg",
+      "sha256": "ac856363c7671ef815892e78e20d1ad18eb5ef5d244999da11ee1e24fe08f67e",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-WmXJS5Eyf8J9gQBubGNAJm",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-V9VSV6AL6Dtn1mteZzHVui",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-U2uXAMvekNa3TghaQTVMy7",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-EongLTTv9gBDegUnjMZrBH",
+          "pages": "6-7"
+        }
+      ]
+    },
+    "viscosimetro": {
+      "display_name": "Viscosímetro",
+      "vector_store_id": "vs_6a9b5dfb7280819193903bbfebc31aef",
+      "full_file_id": "file-FNwSXSgwM73cSRmzHsvVPu",
+      "sha256": "b357a9e2a8caf93de7596ac07628fe8a85068efde3a03a449bab7d6f19c6a324",
+      "page_count": 7,
+      "sections": [
+        {
+          "id": "funcion_y_caracteristicas",
+          "file_id": "file-HftYkwDxK3dtYSbtPX44SE",
+          "pages": "1-3"
+        },
+        {
+          "id": "operacion",
+          "file_id": "file-1q1NxPqLE99Z24N6YWQEFF",
+          "pages": "4-5"
+        },
+        {
+          "id": "seguridad",
+          "file_id": "file-MjEsEjuiiHJuCwF8CLyMHi",
+          "pages": "5-6"
+        },
+        {
+          "id": "mantenimiento_y_problemas",
+          "file_id": "file-8Pq6JaGDnrm64PJoNdo4bG",
+          "pages": "6-7"
+        }
+      ]
     }
-  }
+  },
+  "sources": [
+    "manuales1.zip",
+    "manuales2.zip"
+  ]
 }
