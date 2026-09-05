@@ -26,9 +26,11 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -158,9 +160,6 @@ class CameraFragment : Fragment() {
             }
         }
 
-        viewModel.scannerStatus.observe(viewLifecycleOwner) { status ->
-            binding.tvScanStatus.text = status
-        }
 
         viewModel.assistantLoading.observe(viewLifecycleOwner) { loading ->
             binding.pbAssistant.isVisible = loading
@@ -298,7 +297,6 @@ class CameraFragment : Fragment() {
             return
         }
         setActiveQuestionEquipment()
-        binding.detectionOverlay.submitDetections(emptyList())
         binding.tvCameraAnswer.isVisible = false
         binding.btnSendQuestion.isEnabled = false
         partialTranscript = ""
@@ -468,7 +466,6 @@ class CameraFragment : Fragment() {
         binding.tietCameraQuestion.clearFocus()
         requireContext().getSystemService(InputMethodManager::class.java)
             ?.hideSoftInputFromWindow(binding.tietCameraQuestion.windowToken, 0)
-        binding.detectionOverlay.submitDetections(emptyList())
         voiceState = VoiceState.PROCESSING
         lastSubmittedQuestion = question
         showVoiceState("Preparando la respuesta…")
@@ -564,8 +561,16 @@ class CameraFragment : Fragment() {
     }
 
     private fun startCamera() {
+        val currentBinding = _binding ?: return
+        if (!currentBinding.viewFinder.isLaidOut) {
+            currentBinding.viewFinder.doOnLayout {
+                if (_binding === currentBinding) startCamera()
+            }
+            return
+        }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener({
+            if (_binding !== currentBinding) return@addListener
             val cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
@@ -584,7 +589,9 @@ class CameraFragment : Fragment() {
                 }
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis)
+                binding.viewFinder.viewPort?.let { group.setViewPort(it) }
+                cameraProvider.bindToLifecycle(viewLifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
             } catch (exception: Exception) {
                 Log.e("CameraFragment", "No se pudo iniciar CameraX", exception)
                 Toast.makeText(context, "No pude iniciar la cámara.", Toast.LENGTH_SHORT).show()
@@ -596,7 +603,7 @@ class CameraFragment : Fragment() {
     private fun analyzeCameraFrame(imageProxy: ImageProxy) {
         try {
             val now = SystemClock.elapsedRealtime()
-            if (viewModel.isAnalysisPaused() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
+            if (!viewModel.canAcceptFrame() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
             lastAnalysisAt = now
             val bitmap = imageProxy.toUprightBitmap()
             if (bitmap == null) {
@@ -604,8 +611,10 @@ class CameraFragment : Fragment() {
                 return
             }
             bitmap.let {
+                val frameWidth = it.width
+                val frameHeight = it.height
                 mainHandler.post {
-                    _binding?.detectionOverlay?.setSourceFrameSize(it.width, it.height)
+                    _binding?.detectionOverlay?.setSourceFrameSize(frameWidth, frameHeight)
                 }
                 viewModel.onImageCaptured(it)
             }
@@ -615,7 +624,10 @@ class CameraFragment : Fragment() {
     }
 
     private fun ImageProxy.toUprightBitmap(): Bitmap? = runCatching {
-        val source = toBitmap()
+        val full = toBitmap()
+        val crop = cropRect
+        val source = Bitmap.createBitmap(full, crop.left, crop.top, crop.width(), crop.height())
+        if (source !== full) full.recycle()
         val degrees = imageInfo.rotationDegrees
         if (degrees == 0) {
             source

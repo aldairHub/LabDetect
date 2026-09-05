@@ -164,7 +164,7 @@ internal class EdgeTtsClient(context: Context) {
         const val WINDOWS_EPOCH_SECONDS = 11_644_473_600L
         const val MAX_TEXT_BYTES = 3_900
         const val HEADER_SEPARATOR_BYTES = 2
-        const val CONNECT_TIMEOUT_SECONDS = 12L
-        const val READ_TIMEOUT_SECONDS = 50L
+        const val CONNECT_TIMEOUT_SECONDS = 4L
+        const val READ_TIMEOUT_SECONDS = 8L
     }
 }

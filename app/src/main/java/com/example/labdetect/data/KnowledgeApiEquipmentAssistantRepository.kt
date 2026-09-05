@@ -105,8 +105,8 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             """.trimIndent()
         } else {
             """
-            El manual recuperado con File Search es la única fuente permitida. Debes usar File Search antes de
-            responder. No inventes botones, valores, pasos o procedimientos específicos del modelo. Si la pregunta
+            ${if (vectorStoreId != null) "El manual recuperado con File Search es la única fuente permitida. Debes usar File Search antes de responder." else "El resumen local incluido es la única fuente permitida. Si está vacío o no contiene la respuesta, devuelve el marcador de información faltante."}
+            No inventes botones, valores, pasos o procedimientos específicos del modelo. Si la pregunta
             no trata sobre $equipmentName, responde exactamente: $OUT_OF_SCOPE_MARKER. Si los resultados no dan
             información directa y suficiente para responder, responde únicamente: $MANUAL_INFO_MISSING_MARKER.
             El conocimiento general del modelo no cuenta como información del manual. No uses búsqueda web en esta fase.
@@ -144,7 +144,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             .put("instructions", instructions)
             .put("input", input)
             .put("reasoning", JSONObject().put("effort", "none"))
-            .put("max_output_tokens", 120)
+            .put("max_output_tokens", 350)
             .put("max_tool_calls", 1)
             .put("parallel_tool_calls", false)
             .put("store", false)
@@ -164,23 +164,26 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             payload.put("tools", tools)
             // La primera fase siempre consulta el manual del equipo; la segunda solo
             // se ejecuta después del marcador de información faltante y fuerza web.
-            payload.put("tool_choice", JSONObject().put(
-                "type",
-                if (useWebSearch) "web_search" else "file_search"
-            ))
+            payload.put("tool_choice", "required")
         }
 
-        var response = postResponse(apiKey, payload)
-        if (response.first == 400 && tools.length() > 0) {
-            payload.remove("tools")
-            payload.remove("tool_choice")
-            response = postResponse(apiKey, payload)
-        }
+        val response = postResponse(apiKey, payload)
         if (response.first !in 200..299) {
             error("OpenAI respondió con HTTP ${response.first}")
         }
 
-        val answer = extractOutputText(JSONObject(response.second))
+        val document = JSONObject(response.second)
+        check(document.optString("status") == "completed") { "Respuesta incompleta de OpenAI" }
+        if (tools.length() > 0) {
+            val output = document.optJSONArray("output") ?: JSONArray()
+            val expected = if (useWebSearch) "web_search_call" else "file_search_call"
+            check((0 until output.length()).any {
+                val item = output.optJSONObject(it)
+                item?.optString("type") == expected && item.optString("status") == "completed"
+            }) { "La búsqueda requerida no se completó" }
+        }
+        val answer = extractOutputText(document)
+        if (answer.contains(OUT_OF_SCOPE_MARKER)) return if (useWebSearch) OUT_OF_SCOPE_MESSAGE else OUT_OF_SCOPE_MARKER
         return answer.takeIf { it.isNotBlank() } ?: error("OpenAI devolvió una respuesta vacía")
     }
 

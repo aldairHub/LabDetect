@@ -22,8 +22,9 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     private val piperTts = PiperSpeechEngine(appContext)
     private var fallbackReady = false
     private var player: MediaPlayer? = null
-    private var closed = false
-    private var generation = 0
+    @Volatile private var closed = false
+    @Volatile private var generation = 0
+    private var edgeRetryAfter = 0L
     private var onFinished: (() -> Unit)? = null
 
     override fun onInit(status: Int) {
@@ -56,10 +57,11 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
             stopPlayback(completePrevious = true)
             onFinished = finished
             val requestGeneration = ++generation
-            if (!hasInternet()) {
+            if (!hasInternet() || android.os.SystemClock.elapsedRealtime() < edgeRetryAfter) {
                 speakWithOfflineVoice(cleanText, requestGeneration)
             } else {
                 executor.execute {
+                    if (closed || requestGeneration != generation) return@execute
                     val audioFile = runCatching { edgeTts.synthesize(cleanText) }.getOrNull()
                     mainHandler.post {
                         if (closed || requestGeneration != generation) {
@@ -68,6 +70,7 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
                             piperTts.prepareForOfflineUse()
                             playAudio(audioFile, cleanText, requestGeneration)
                         } else {
+                            edgeRetryAfter = android.os.SystemClock.elapsedRealtime() + 60_000L
                             speakWithOfflineVoice(cleanText, requestGeneration)
                         }
                     }
@@ -130,6 +133,7 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
 
     private fun speakWithOfflineVoice(text: String, requestGeneration: Int) {
         executor.execute {
+            if (closed || requestGeneration != generation) return@execute
             val offlineAudio = piperTts.synthesizeIfInstalled(text)
             mainHandler.post {
                 if (closed || requestGeneration != generation) {
@@ -146,7 +150,9 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
 
     private fun finishIfCurrent(utteranceId: String?) {
         val utteranceGeneration = utteranceId?.removePrefix(UTTERANCE_PREFIX)?.toIntOrNull()
-        if (utteranceGeneration == generation) mainHandler.post { completeSpeech() }
+        mainHandler.post {
+            if (!closed && utteranceGeneration == generation) completeSpeech()
+        }
     }
 
     private fun stopPlayback(completePrevious: Boolean) {

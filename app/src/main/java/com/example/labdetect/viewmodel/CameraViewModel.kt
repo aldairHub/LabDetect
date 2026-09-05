@@ -62,7 +62,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 // La ampliación central es útil para equipos lejanos, pero cuesta una
                 // segunda inferencia completa. Se hace cada tres análisis, no en cada
                 // fotograma sin detección; el objeto cercano sigue apareciendo enseguida.
-                val allowCenterCrop = ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
+                val allowCenterCrop = previousFrameDetections.isNotEmpty() ||
+                    ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
                 val results = detector.detect(bitmap, allowCenterCrop)
                 if (analysisPaused.get()) return@launch
                 // Las señales medias solo sirven para comprobar estabilidad entre dos
@@ -98,6 +99,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         _classificationResult.postValue(detected)
                         publishScannerStatus("DETECTADO · ${detected.label.uppercase()}")
                     } else if (conversationTarget == null) {
+                        _detections.postValue(emptyList())
+                        _classificationResult.postValue(null)
+                        lastDetectedResult = null
                         val strongest = candidates.maxByOrNull { it.confidence }
                         strongest?.let {
                             publishScannerStatus("CONFIRMANDO · ${it.label.uppercase()} ${"%.0f".format(it.confidence)}%")
@@ -125,7 +129,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         conversationTarget = detected
         analysisPaused.set(true)
         _classificationResult.value = detected
-        _detections.value = emptyList()
+        // La cámara deja de analizar durante la consulta para no cambiar de equipo,
+        // pero conservamos la última caja confirmada: así el usuario sigue viendo
+        // exactamente a qué aparato se refiere la respuesta.
         return true
     }
 
@@ -142,6 +148,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun isAnalysisPaused(): Boolean = analysisPaused.get()
+
+    fun canAcceptFrame(): Boolean = !analysisPaused.get() && !inferenceRunning.get()
 
     fun reportFrameReadFailure() {
         publishScannerStatus("CAMERA ACTIVA · NO PUDE LEER EL FOTOGRAMA")

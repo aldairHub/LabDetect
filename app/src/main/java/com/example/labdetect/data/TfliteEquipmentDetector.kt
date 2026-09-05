@@ -23,6 +23,13 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
     private val outputShape: IntArray
     private val inputSize: Int
     private val classes: List<EquipmentClass>
+    private val reusableInput by lazy {
+        ByteBuffer.allocateDirect(interpreter!!.getInputTensor(0).numBytes()).order(ByteOrder.nativeOrder())
+    }
+    private val reusableOutput by lazy {
+        ByteBuffer.allocateDirect(interpreter!!.getOutputTensor(0).numBytes()).order(ByteOrder.nativeOrder())
+    }
+    private val reusablePixels by lazy { IntArray(inputSize * inputSize) }
 
     val isReady: Boolean get() = interpreter != null
 
@@ -90,8 +97,7 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         val prepared = letterbox(bitmap)
         return try {
             val input = bitmapToInput(prepared.bitmap)
-            val output = ByteBuffer.allocateDirect(activeInterpreter.getOutputTensor(0).numBytes())
-                .order(ByteOrder.nativeOrder())
+            val output = reusableOutput.apply { clear() }
             activeInterpreter.run(input, output)
             output.rewind()
             parseOutput(
@@ -113,9 +119,8 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
     }
 
     private fun bitmapToInput(bitmap: Bitmap): ByteBuffer {
-        val input = ByteBuffer.allocateDirect(interpreter!!.getInputTensor(0).numBytes())
-            .order(ByteOrder.nativeOrder())
-        val pixels = IntArray(inputSize * inputSize)
+        val input = reusableInput.apply { clear() }
+        val pixels = reusablePixels
         bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
         val nchw = inputShape[1] == 3
         if (nchw) {
