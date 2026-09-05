@@ -42,6 +42,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _modelReady = MutableLiveData(detector.isReady)
     val modelReady: LiveData<Boolean> = _modelReady
 
+    private val _scannerStatus = MutableLiveData(if (detector.isReady) "ESCANEANDO · YOLO ACTIVO" else "MODELO NO DISPONIBLE")
+    val scannerStatus: LiveData<String> = _scannerStatus
+    private var lastScannerStatus = _scannerStatus.value.orEmpty()
+
     private val _assistantAnswer = MutableLiveData<OneShotEvent<String>>()
     val assistantAnswer: LiveData<OneShotEvent<String>> = _assistantAnswer
 
@@ -92,6 +96,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         lastDetectedResult = detected
                         _classificationResult.postValue(detected)
+                        publishScannerStatus("DETECTADO · ${detected.label.uppercase()}")
+                    } else if (conversationTarget == null) {
+                        val strongest = candidates.maxByOrNull { it.confidence }
+                        strongest?.let {
+                            publishScannerStatus("CONFIRMANDO · ${it.label.uppercase()} ${"%.0f".format(it.confidence)}%")
+                        }
                     }
                 } else {
                     twoFramesAgoDetections = previousFrameDetections
@@ -100,6 +110,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         _detections.postValue(emptyList())
                         _classificationResult.postValue(null)
                         lastDetectedResult = null
+                        publishScannerStatus("ESCANEANDO · BUSCANDO EQUIPO")
                     }
                 }
             } finally {
@@ -131,6 +142,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun isAnalysisPaused(): Boolean = analysisPaused.get()
+
+    fun reportFrameReadFailure() {
+        publishScannerStatus("CAMERA ACTIVA · NO PUDE LEER EL FOTOGRAMA")
+    }
 
     fun askAssistant(question: String) {
         val result = conversationTarget ?: _classificationResult.value
@@ -169,6 +184,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         val previousArea = max(0f, previous.right - previous.left) * max(0f, previous.bottom - previous.top)
         val union = currentArea + previousArea - intersection
         return union > 0f && intersection / union >= STABLE_BOX_IOU
+    }
+
+    private fun publishScannerStatus(value: String) {
+        if (value == lastScannerStatus) return
+        lastScannerStatus = value
+        _scannerStatus.postValue(value)
     }
 
     companion object {

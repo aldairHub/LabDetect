@@ -158,6 +158,10 @@ class CameraFragment : Fragment() {
             }
         }
 
+        viewModel.scannerStatus.observe(viewLifecycleOwner) { status ->
+            binding.tvScanStatus.text = status
+        }
+
         viewModel.assistantLoading.observe(viewLifecycleOwner) { loading ->
             binding.pbAssistant.isVisible = loading
             binding.btnSendQuestion.isEnabled = !loading && voiceState == VoiceState.IDLE
@@ -594,11 +598,16 @@ class CameraFragment : Fragment() {
             val now = SystemClock.elapsedRealtime()
             if (viewModel.isAnalysisPaused() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
             lastAnalysisAt = now
-            imageProxy.toUprightBitmap()?.let { bitmap ->
+            val bitmap = imageProxy.toUprightBitmap()
+            if (bitmap == null) {
+                viewModel.reportFrameReadFailure()
+                return
+            }
+            bitmap.let {
                 mainHandler.post {
-                    _binding?.detectionOverlay?.setSourceFrameSize(bitmap.width, bitmap.height)
+                    _binding?.detectionOverlay?.setSourceFrameSize(it.width, it.height)
                 }
-                viewModel.onImageCaptured(bitmap)
+                viewModel.onImageCaptured(it)
             }
         } finally {
             imageProxy.close()
@@ -621,6 +630,8 @@ class CameraFragment : Fragment() {
                 true
             ).also { source.recycle() }
         }
+    }.onFailure { error ->
+        Log.e("CameraFragment", "CameraX no pudo convertir un fotograma para YOLO", error)
     }.getOrNull()
 
     private fun cameraPermissionGranted() = ContextCompat.checkSelfPermission(
