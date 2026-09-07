@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.hardware.camera2.CaptureRequest
 import android.os.Bundle
 import android.os.SystemClock
 import android.speech.RecognitionListener
@@ -16,6 +17,7 @@ import android.util.Log
 import android.util.Size
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -23,10 +25,13 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -44,6 +49,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class CameraFragment : Fragment() {
     private var _binding: FragmentCameraBinding? = null
@@ -53,6 +59,7 @@ class CameraFragment : Fragment() {
     private val cameraAnalysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var lastAnalysisAt = 0L
     private val viewModel: CameraViewModel by viewModels()
+    private var activeCamera: Camera? = null
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var speechEngine: AndroidSpeechEngine
@@ -122,6 +129,13 @@ class CameraFragment : Fragment() {
         binding.btnFeedbackCorrect.setOnClickListener { showCorrectionPicker() }
         binding.fabMic.setOnClickListener { handleMicClick() }
         binding.btnSendQuestion.setOnClickListener { submitTypedQuestion() }
+        binding.viewFinder.setOnTouchListener { viewFinder, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                viewFinder.performClick()
+                focusAndMeterAt(event.x, event.y)
+            }
+            true
+        }
         binding.tietCameraQuestion.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 submitTypedQuestion()
@@ -572,13 +586,22 @@ class CameraFragment : Fragment() {
         cameraProviderFuture.addListener({
             if (_binding !== currentBinding) return@addListener
             val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
+            val previewBuilder = Preview.Builder()
+                .setTargetResolution(Size(1920, 1080))
+            Camera2Interop.Extender(previewBuilder)
+                .setCaptureRequestOption(
+                    CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                )
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+            val preview = previewBuilder.build().also {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
             val analysis = ImageAnalysis.Builder()
-                // YOLO recibe 640 px; pedir a CameraX una salida cercana evita convertir
-                // fotos de varios megapíxeles para luego reducirlas al mismo tamaño.
-                .setTargetResolution(Size(640, 480))
+                // Una fuente 720p conserva detalle y permite al autofocus/exposición
+                // trabajar mejor; YOLO la reduce internamente a sus 640 px.
+                .setTargetResolution(Size(1280, 720))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setTargetRotation(binding.viewFinder.display.rotation)
                 .build()
@@ -591,12 +614,27 @@ class CameraFragment : Fragment() {
                 cameraProvider.unbindAll()
                 val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis)
                 binding.viewFinder.viewPort?.let { group.setViewPort(it) }
-                cameraProvider.bindToLifecycle(viewLifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
+                activeCamera = cameraProvider.bindToLifecycle(
+                    viewLifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    group.build()
+                )
+                focusAndMeterAt(currentBinding.viewFinder.width / 2f, currentBinding.viewFinder.height / 2f)
             } catch (exception: Exception) {
                 Log.e("CameraFragment", "No se pudo iniciar CameraX", exception)
                 Toast.makeText(context, "No pude iniciar la cámara.", Toast.LENGTH_SHORT).show()
             }
         }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    private fun focusAndMeterAt(x: Float, y: Float) {
+        val camera = activeCamera ?: return
+        val point = binding.viewFinder.meteringPointFactory.createPoint(x, y)
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
+        ).setAutoCancelDuration(2, TimeUnit.SECONDS).build()
+        camera.cameraControl.startFocusAndMetering(action)
     }
 
     /** Analiza el fotograma original que entrega CameraX, no una captura de la vista previa. */
@@ -673,6 +711,6 @@ class CameraFragment : Fragment() {
 
     companion object {
         private const val RECOGNITION_RESULT_TIMEOUT_MS = 4_000L
-        private const val ANALYSIS_INTERVAL_MS = 250L
+        private const val ANALYSIS_INTERVAL_MS = 60L
     }
 }

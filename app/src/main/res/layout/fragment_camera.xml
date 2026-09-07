@@ -8,7 +8,8 @@
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
 
     <com.example.labdetect.DetectionOverlayView
         android:id="@+id/detectionOverlay"
@@ -279,23 +280,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Pregunta sobre el equipo"
                     app:boxBackgroundColor="#1FFFFFFF"
                     app:boxBackgroundMode="filled"
                     app:boxCornerRadiusBottomEnd="18dp"
                     app:boxCornerRadiusBottomStart="18dp"
                     app:boxCornerRadiusTopEnd="18dp"
                     app:boxCornerRadiusTopStart="18dp"
-                    app:boxStrokeColor="@color/lab_teal"
-                    app:hintTextColor="@color/lab_muted_dark">
+                    app:boxStrokeWidth="0dp"
+                    app:boxStrokeWidthFocused="0dp"
+                    app:hintEnabled="false">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/tietCameraQuestion"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:hint="Pregunta sobre el equipo"
                         android:imeOptions="actionSend"
                         android:inputType="textCapSentences"
-                        android:maxLines="2"
+                        android:maxLines="1"
+                        android:minHeight="56dp"
+                        android:paddingHorizontal="16dp"
                         android:textColor="@color/white"
                         android:textColorHint="@color/lab_muted_dark" />
                 </com.google.android.material.textfield.TextInputLayout>

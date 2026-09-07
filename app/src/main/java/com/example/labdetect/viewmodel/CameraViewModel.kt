@@ -29,7 +29,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private var consecutiveMisses = 0
     private var analyzedFrames = 0
     private var previousFrameDetections: List<Detection> = emptyList()
-    private var twoFramesAgoDetections: List<Detection> = emptyList()
+    private var olderFrameDetections: List<Detection> = emptyList()
     @Volatile private var lastDetectedResult: ClassificationResult? = null
     @Volatile private var conversationTarget: ClassificationResult? = null
     private var assistantJob: Job? = null
@@ -68,29 +68,29 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 val results = detector.detect(bitmap, allowCenterCrop)
                 if (analysisPaused.get()) return@launch
                 // Las señales medias solo sirven para comprobar estabilidad entre dos
-                // fotos. No se dibujan ni se usan para conversar hasta superar 65 %.
+                // fotos. No se dibujan ni se usan para conversar hasta superar 85 %.
                 val candidates = results.filter { it.confidence >= MIN_CANDIDATE_CONFIDENCE }
                 if (candidates.isNotEmpty()) {
                     consecutiveMisses = 0
                     val confirmed = candidates.filter { candidate ->
-                        candidate.confidence >= MIN_INSTANT_CONFIDENCE ||
-                            (candidate.confidence >= MIN_CONFIRMED_CONFIDENCE &&
-                                previousFrameDetections.any { previous ->
-                                    isSameEquipment(candidate, previous)
-                                }) ||
-                            (candidate.confidence >= MIN_STABLE_LOW_CONFIDENCE &&
-                                previousFrameDetections.any { previous ->
-                                    isSameEquipment(candidate, previous)
-                                } && twoFramesAgoDetections.any { older ->
-                                    isSameEquipment(candidate, older)
-                                })
+                        if (candidate.confidence < MIN_VISIBLE_CONFIDENCE) return@filter false
+                        val matchesPrevious = previousFrameDetections.any { previous ->
+                            previous.confidence >= MIN_PREVIOUS_CONFIDENCE &&
+                                isSameEquipment(candidate, previous)
+                        }
+                        matchesPrevious && (
+                            candidate.confidence >= FAST_CONFIRM_CONFIDENCE ||
+                                olderFrameDetections.any { older ->
+                                    older.confidence >= MIN_PREVIOUS_CONFIDENCE &&
+                                        isSameEquipment(candidate, older)
+                                }
+                            )
                     }
-                    twoFramesAgoDetections = previousFrameDetections
+                    olderFrameDetections = previousFrameDetections
                     previousFrameDetections = candidates
 
-                    // Cada cuadro visible debe persistir en dos capturas consecutivas y en
-                    // la misma zona. Esto descarta falsos positivos débiles, pero permite
-                    // reconocer equipos antes de alcanzar el 80 %.
+                    // Una lectura de 93 % aparece tras dos cuadros; entre 85 y 93 % se
+                    // comprueba uno adicional para filtrar reflejos de monitores.
                     if (confirmed.isNotEmpty() && conversationTarget == null) {
                         _detections.postValue(confirmed)
                         val detected = confirmed.first().let {
@@ -109,7 +109,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
                 } else {
-                    twoFramesAgoDetections = previousFrameDetections
+                    olderFrameDetections = emptyList()
                     previousFrameDetections = emptyList()
                     if (++consecutiveMisses >= MISSES_BEFORE_CLEAR && conversationTarget == null) {
                         _detections.postValue(emptyList())
@@ -220,10 +220,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         // Dos ausencias seguidas quitan inmediatamente una detección que ya salió de
         // cámara, sin provocar parpadeos por una imagen borrosa aislada.
         private const val MISSES_BEFORE_CLEAR = 2
-        private const val MIN_CANDIDATE_CONFIDENCE = 45f
-        private const val MIN_CONFIRMED_CONFIDENCE = 65f
-        private const val MIN_INSTANT_CONFIDENCE = 85f
-        private const val MIN_STABLE_LOW_CONFIDENCE = 45f
+        private const val MIN_CANDIDATE_CONFIDENCE = 60f
+        private const val MIN_VISIBLE_CONFIDENCE = 85f
+        private const val FAST_CONFIRM_CONFIDENCE = 93f
+        // La primera lectura puede ser más débil mientras autofocus y exposición
+        // se estabilizan; la segunda todavía debe superar 85 % para mostrarse.
+        private const val MIN_PREVIOUS_CONFIDENCE = 70f
         private const val STABLE_BOX_IOU = 0.28f
         private const val STABLE_CENTER_DISTANCE = 0.18f
         private const val CENTER_CROP_EVERY_N_FRAMES = 3

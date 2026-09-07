@@ -2,15 +2,17 @@
   "model": "labdetect_yolo11s.tflite",
   "format": "tflite",
   "input_size": 640,
-  "input_layout": "NCHW",
+  "input_layout": "NHWC",
   "color_order": "RGB",
   "normalization": "0..1",
   "nms_embedded": false,
   "source_metadata": {
     "architecture": "Ultralytics YOLO11s",
-    "ultralytics_version": "8.4.138",
-    "exported_at": "2026-09-04T18:08:15.253644+00:00",
-    "sha256": "5cb13f44c8c1900567f2065d9c73e21f6be0ab092fdb6c0b5ca8e6e3e495e435"
+    "ultralytics_version": "8.4.141",
+    "training": "stage5_localization_verified",
+    "validation_map50": 0.99097,
+    "validation_map50_95": 0.92822,
+    "sha256": "0281e4d683671a2be966e19b69c9ef4086e6cb0f1083e3345e34462ad483620a"
   },
   "classes": [
     {"id":"agitador_calentador","label":"Agitador calentador"},
@@ -37,6 +39,7 @@
     {"id":"mufla","label":"Mufla"},
     {"id":"phmetro","label":"pHmetro"},
     {"id":"refractometro","label":"Refractómetro"},
-    {"id":"viscosimetro","label":"Viscosímetro"}
+    {"id":"viscosimetro","label":"Viscosímetro"},
+    {"id":"extractor_grasa","label":"Extractor de grasa"}
   ]
 }

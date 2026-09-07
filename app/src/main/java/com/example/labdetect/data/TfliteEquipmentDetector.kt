@@ -205,7 +205,7 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
                 originalWidth = originalWidth,
                 originalHeight = originalHeight
             )
-            if (detection != null) parsed += detection
+            if (detection != null && isPlausibleDetection(detection)) parsed += detection
         }
         return nonMaxSuppression(parsed)
     }
@@ -256,6 +256,15 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         return accepted.take(MAX_DETECTIONS)
     }
 
+    // Una caja que ocupa casi toda la vista suele ser el marco de una pantalla o un
+    // reflejo, no un equipo de laboratorio. Evitarla corta falsos positivos sin
+    // descartar aparatos que el usuario enfoca de cerca.
+    private fun isPlausibleDetection(detection: Detection): Boolean {
+        val width = detection.right - detection.left
+        val height = detection.bottom - detection.top
+        return width * height < MAX_FRAME_COVERAGE
+    }
+
     private fun intersectionOverUnion(a: Detection, b: Detection): Float {
         val left = max(a.left, b.left)
         val top = max(a.top, b.top)
@@ -301,10 +310,13 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         // Piso interno: conserva señales para confirmarlas entre fotogramas, pero la
         // interfaz solo muestra las que superan un umbral mucho más alto en el ViewModel.
         private const val CONFIDENCE_THRESHOLD = 0.25f
-        private const val DIRECT_FRAME_CONFIDENCE = 65f
+        // Si la pasada completa aún no alcanza el umbral visible, la ampliación
+        // central puede recuperar detalle antes de decidir que no hay equipo.
+        private const val DIRECT_FRAME_CONFIDENCE = 85f
         private const val NMS_IOU_THRESHOLD = 0.45f
         private const val CENTER_CROP_RATIO = 0.72f
         private const val MAX_DETECTIONS = 20
+        private const val MAX_FRAME_COVERAGE = 0.92f
         private const val MIN_FEATURES = 6
         private const val MAX_FEATURES = 256
     }
