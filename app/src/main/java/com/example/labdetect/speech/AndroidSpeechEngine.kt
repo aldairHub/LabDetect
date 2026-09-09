@@ -27,6 +27,10 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     private var edgeRetryAfter = 0L
     private var onFinished: (() -> Unit)? = null
 
+    init {
+        piperTts.prepareForOfflineUse()
+    }
+
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
         val bestVoice = fallbackTts.voices.orEmpty()
@@ -67,7 +71,6 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
                         if (closed || requestGeneration != generation) {
                             audioFile?.delete()
                         } else if (audioFile != null) {
-                            piperTts.prepareForOfflineUse()
                             playAudio(audioFile, cleanText, requestGeneration)
                         } else {
                             edgeRetryAfter = android.os.SystemClock.elapsedRealtime() + 60_000L

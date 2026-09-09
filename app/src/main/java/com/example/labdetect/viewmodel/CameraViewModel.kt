@@ -25,11 +25,9 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val assistant = KnowledgeApiEquipmentAssistantRepository(application)
     private val equipmentCatalog = LocalEquipmentCatalog(application)
     private val inferenceRunning = AtomicBoolean(false)
-    private val analysisPaused = AtomicBoolean(false)
     private var consecutiveMisses = 0
     private var analyzedFrames = 0
     private var previousFrameDetections: List<Detection> = emptyList()
-    private var olderFrameDetections: List<Detection> = emptyList()
     @Volatile private var lastDetectedResult: ClassificationResult? = null
     @Volatile private var conversationTarget: ClassificationResult? = null
     private var assistantJob: Job? = null
@@ -54,7 +52,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val assistantLoading: LiveData<Boolean> = _assistantLoading
 
     fun onImageCaptured(bitmap: Bitmap) {
-        if (analysisPaused.get() || !inferenceRunning.compareAndSet(false, true)) {
+        if (!inferenceRunning.compareAndSet(false, true)) {
             if (!bitmap.isRecycled) bitmap.recycle()
             return
         }
@@ -66,56 +64,44 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 val allowCenterCrop = previousFrameDetections.isNotEmpty() ||
                     ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
                 val results = detector.detect(bitmap, allowCenterCrop)
-                if (analysisPaused.get()) return@launch
-                // Las señales medias solo sirven para comprobar estabilidad entre dos
-                // fotos. No se dibujan ni se usan para conversar hasta superar 85 %.
                 val candidates = results.filter { it.confidence >= MIN_CANDIDATE_CONFIDENCE }
                 if (candidates.isNotEmpty()) {
-                    consecutiveMisses = 0
                     val confirmed = candidates.filter { candidate ->
-                        if (candidate.confidence < MIN_VISIBLE_CONFIDENCE) return@filter false
+                        if (candidate.confidence < MIN_CONFIRMED_CONFIDENCE) return@filter false
                         val matchesPrevious = previousFrameDetections.any { previous ->
                             previous.confidence >= MIN_PREVIOUS_CONFIDENCE &&
                                 isSameEquipment(candidate, previous)
                         }
-                        matchesPrevious && (
-                            candidate.confidence >= FAST_CONFIRM_CONFIDENCE ||
-                                olderFrameDetections.any { older ->
-                                    older.confidence >= MIN_PREVIOUS_CONFIDENCE &&
-                                        isSameEquipment(candidate, older)
-                                }
-                            )
+                        matchesPrevious
                     }
-                    olderFrameDetections = previousFrameDetections
                     previousFrameDetections = candidates
+                    val preview = candidates.filter { it.confidence >= MIN_PREVIEW_CONFIDENCE }
+                    _detections.postValue(
+                        if (confirmed.isNotEmpty()) confirmed.map { it.copy(confirmed = true) } else preview
+                    )
 
-                    // Una lectura de 93 % aparece tras dos cuadros; entre 85 y 93 % se
-                    // comprueba uno adicional para filtrar reflejos de monitores.
-                    if (confirmed.isNotEmpty() && conversationTarget == null) {
-                        _detections.postValue(confirmed)
+                    if (preview.isEmpty()) {
+                        if (++consecutiveMisses >= MISSES_BEFORE_CLEAR) clearDetection()
+                        return@launch
+                    }
+                    consecutiveMisses = 0
+
+                    if (confirmed.isNotEmpty()) {
                         val detected = confirmed.first().let {
                             ClassificationResult(it.canonicalId, it.label, it.confidence)
                         }
                         lastDetectedResult = detected
                         _classificationResult.postValue(detected)
-                        publishScannerStatus("DETECTADO · ${detected.label.uppercase()}")
-                    } else if (conversationTarget == null) {
-                        _detections.postValue(emptyList())
-                        _classificationResult.postValue(null)
-                        lastDetectedResult = null
-                        val strongest = candidates.maxByOrNull { it.confidence }
-                        strongest?.let {
-                            publishScannerStatus("CONFIRMANDO · ${it.label.uppercase()} ${"%.0f".format(it.confidence)}%")
+                        publishScannerStatus("UTEQ · DETECTADO")
+                    } else {
+                        preview.maxByOrNull { it.confidence }?.let {
+                            publishScannerStatus("UTEQ · ENFOCANDO ${"%.0f".format(it.confidence)}%")
                         }
                     }
                 } else {
-                    olderFrameDetections = emptyList()
                     previousFrameDetections = emptyList()
-                    if (++consecutiveMisses >= MISSES_BEFORE_CLEAR && conversationTarget == null) {
-                        _detections.postValue(emptyList())
-                        _classificationResult.postValue(null)
-                        lastDetectedResult = null
-                        publishScannerStatus("ESCANEANDO · BUSCANDO EQUIPO")
+                    if (++consecutiveMisses >= MISSES_BEFORE_CLEAR) {
+                        clearDetection()
                     }
                 }
             } finally {
@@ -128,29 +114,21 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun beginQuestionSession(): Boolean {
         val detected = _classificationResult.value ?: lastDetectedResult ?: return false
         conversationTarget = detected
-        analysisPaused.set(true)
         _classificationResult.value = detected
-        // La cámara deja de analizar durante la consulta para no cambiar de equipo,
-        // pero conservamos la última caja confirmada: así el usuario sigue viendo
-        // exactamente a qué aparato se refiere la respuesta.
         return true
     }
 
     fun cancelQuestionSession() {
         if (_assistantLoading.value != true) {
             conversationTarget = null
-            analysisPaused.set(false)
         }
     }
 
     fun endQuestionSession() {
         conversationTarget = null
-        analysisPaused.set(false)
     }
 
-    fun isAnalysisPaused(): Boolean = analysisPaused.get()
-
-    fun canAcceptFrame(): Boolean = !analysisPaused.get() && !inferenceRunning.get()
+    fun canAcceptFrame(): Boolean = !inferenceRunning.get()
 
     fun reportFrameReadFailure() {
         publishScannerStatus("CAMERA ACTIVA · NO PUDE LEER EL FOTOGRAMA")
@@ -216,15 +194,20 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _scannerStatus.postValue(value)
     }
 
+    private fun clearDetection() {
+        _detections.postValue(emptyList())
+        _classificationResult.postValue(null)
+        lastDetectedResult = null
+        publishScannerStatus("UTEQ · ESCANEANDO")
+    }
+
     companion object {
         // Dos ausencias seguidas quitan inmediatamente una detección que ya salió de
         // cámara, sin provocar parpadeos por una imagen borrosa aislada.
         private const val MISSES_BEFORE_CLEAR = 2
         private const val MIN_CANDIDATE_CONFIDENCE = 60f
-        private const val MIN_VISIBLE_CONFIDENCE = 85f
-        private const val FAST_CONFIRM_CONFIDENCE = 93f
-        // La primera lectura puede ser más débil mientras autofocus y exposición
-        // se estabilizan; la segunda todavía debe superar 85 % para mostrarse.
+        private const val MIN_PREVIEW_CONFIDENCE = 70f
+        private const val MIN_CONFIRMED_CONFIDENCE = 85f
         private const val MIN_PREVIOUS_CONFIDENCE = 70f
         private const val STABLE_BOX_IOU = 0.28f
         private const val STABLE_CENTER_DISTANCE = 0.18f

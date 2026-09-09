@@ -74,10 +74,13 @@ class LocalManualRepository(context: Context) {
         if (!isEquipmentQuestion(normalizedQuestion, manual)) {
             return "Puedo ayudarte únicamente con el equipo que estás enfocando."
         }
+        if (containsAny(normalizedQuestion, "precio", "cuesta", "vale", "valor", "costo")) {
+            return "No tengo un precio guardado para este equipo. Sin conexión no puedo verificarlo; cuando vuelva internet lo buscaré automáticamente."
+        }
         val selected = when {
             containsAny(normalizedQuestion, "seguridad", "precaucion", "riesgo", "peligro", "cuidado") ->
                 manual.safety
-            containsAny(normalizedQuestion, "mantenimiento", "limpiar", "limpieza", "conservar") ->
+            containsAny(normalizedQuestion, "mantenimiento", "limpiar", "limpieza", "conservar", "falla", "error", "vibra") ->
                 manual.maintenance
             containsAny(normalizedQuestion, "usar", "uso", "procedimiento", "encender", "operar", "manejar") ->
                 manual.procedure
@@ -85,11 +88,9 @@ class LocalManualRepository(context: Context) {
                 manual.specifications
             else -> manual.function
         }
-        // La burbuja está diseñada para una respuesta breve que se pueda leer y oír
-        // sin cortar la última frase cuando no hay conexión.
-        val answer = naturalSpeech(selected, 26)
+        val answer = naturalSpeech(selected, 34)
         return answer.ifBlank {
-            "${manual.displayName} está documentado en el manual guardado. Puedes abrirlo desde los detalles del equipo."
+            "Tengo información general de ${manual.displayName}, pero ese dato no está guardado. Cuando haya internet lo buscaré automáticamente."
         }
     }
 
@@ -104,19 +105,34 @@ class LocalManualRepository(context: Context) {
             "usar", "uso", "operar", "encender", "apagar", "limpiar", "mantenimiento",
             "seguridad", "riesgo", "peligro", "precaucion", "temperatura", "capacidad",
             "rango", "muestra", "medir", "tiempo", "manual", "procedimiento", "calibrar",
-            "caracteristica", "especificacion", "boton", "control", "voltaje", "presion", "velocidad"
+            "caracteristica", "especificacion", "boton", "control", "voltaje", "presion", "velocidad",
+            "precio", "cuesta", "vale", "valor", "costo", "falla", "error", "vibra"
         )
     }
 
     private fun naturalSpeech(text: String, maxWords: Int): String {
         val cleaned = text
             .replace('●', '.')
+            .replace('•', '.')
             .replace(Regex("""\s+\d{1,2}\s+(?=[A-ZÁÉÍÓÚ])"""), ". ")
             .replace(Regex("""\s+"""), " ")
             .replace(Regex("""\.{2,}"""), ".")
             .trim(' ', '.', ':')
-        val words = cleaned.split(' ').filter { it.isNotBlank() }
-        val shortened = if (words.size <= maxWords) cleaned else words.take(maxWords).joinToString(" ").trimEnd(',', ';') + "."
+        val sentences = cleaned.split(Regex("""(?<=[.!?])\s+"""))
+            .filter { it.isNotBlank() }
+        val shortened = buildString {
+            var count = 0
+            for (sentence in sentences.take(2)) {
+                val words = sentence.split(' ').filter { it.isNotBlank() }
+                if (count + words.size > maxWords) {
+                    if (isEmpty()) append(words.take(maxWords).joinToString(" ").trimEnd(',', ';')).append('.')
+                    break
+                }
+                if (isNotEmpty()) append(' ')
+                append(sentence.trimEnd(',', ';'))
+                count += words.size
+            }
+        }.ifBlank { cleaned }
         return shortened.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 

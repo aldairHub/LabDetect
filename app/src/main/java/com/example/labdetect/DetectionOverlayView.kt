@@ -18,6 +18,9 @@ class DetectionOverlayView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = 5f
     }
+    private val candidatePaint = Paint(boxPaint).apply {
+        color = Color.rgb(255, 193, 7)
+    }
     private var detections: List<Detection> = emptyList()
     private var sourceWidth = 0
     private var sourceHeight = 0
@@ -39,7 +42,10 @@ class DetectionOverlayView @JvmOverloads constructor(
         super.onDraw(canvas)
         detections.forEach { detection ->
             val box = mapToPreview(detection)
-            canvas.drawRect(box, boxPaint)
+            canvas.drawRect(
+                box,
+                if (detection.confirmed) boxPaint else candidatePaint
+            )
         }
     }
 
@@ -64,4 +70,5 @@ class DetectionOverlayView @JvmOverloads constructor(
             detection.bottom * sourceHeight * scale + offsetY
         )
     }
+
 }

@@ -116,9 +116,6 @@ class CameraFragment : Fragment() {
         defaultMicTint = binding.fabMic.backgroundTintList
         configureSpeechRecognizer()
 
-        if (cameraPermissionGranted()) {
-            startCamera()
-        }
         binding.fabMic.isEnabled = true
         requestMissingPermissions()
 
@@ -168,6 +165,10 @@ class CameraFragment : Fragment() {
             binding.detectionOverlay.submitDetections(detections)
         }
 
+        viewModel.scannerStatus.observe(viewLifecycleOwner) { status ->
+            binding.tvScanStatus.text = status
+        }
+
         viewModel.modelReady.observe(viewLifecycleOwner) { ready ->
             if (!ready) {
                 Toast.makeText(context, "Modelo de detección pendiente de instalar", Toast.LENGTH_LONG).show()
@@ -181,7 +182,7 @@ class CameraFragment : Fragment() {
             binding.fabMic.isEnabled = !loading && voiceState == VoiceState.IDLE
             if (loading && !isListening) {
                 voiceState = VoiceState.PROCESSING
-                showVoiceState("Preparando la respuesta…")
+                showVoiceState("Consultando información del equipo…")
             }
         }
 
@@ -205,7 +206,7 @@ class CameraFragment : Fragment() {
             }
             voiceState = VoiceState.SPEAKING
             binding.fabMic.isEnabled = false
-            showVoiceState("Respondiendo sobre ${binding.tvEquipmentName.text}…")
+            showVoiceState("Respondiendo sobre ${activeQuestionEquipmentName ?: "el equipo"}…")
             speechEngine.speak(answer) {
                 if (_binding != null) {
                     finishInteraction()
@@ -369,9 +370,9 @@ class CameraFragment : Fragment() {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, requireContext().packageName)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10_000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 10_000L)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
             putStringArrayListExtra("android.speech.extra.BIASING_STRINGS", ArrayList(speechVocabulary()))
         }
         runCatching { speechRecognizer.startListening(intent) }
@@ -410,7 +411,7 @@ class CameraFragment : Fragment() {
         lastSubmittedQuestion = text.trim()
         voiceState = VoiceState.PROCESSING
         resetMicVisual()
-        showVoiceState("Preparando la respuesta…")
+        showVoiceState("Consultando información del equipo…")
         viewModel.askAssistant(text.trim())
     }
 
@@ -482,7 +483,7 @@ class CameraFragment : Fragment() {
             ?.hideSoftInputFromWindow(binding.tietCameraQuestion.windowToken, 0)
         voiceState = VoiceState.PROCESSING
         lastSubmittedQuestion = question
-        showVoiceState("Preparando la respuesta…")
+        showVoiceState("Consultando información del equipo…")
         viewModel.askAssistant(question)
     }
 
@@ -694,12 +695,18 @@ class CameraFragment : Fragment() {
         Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED
 
+    override fun onResume() {
+        super.onResume()
+        if (cameraPermissionGranted()) startCamera()
+    }
+
     override fun onDestroyView() {
         mainHandler.removeCallbacksAndMessages(null)
         runCatching { speechRecognizer.cancel() }
         speechRecognizer.destroy()
         speechEngine.close()
         viewModel.endQuestionSession()
+        activeCamera = null
         _binding = null
         super.onDestroyView()
     }
@@ -710,7 +717,7 @@ class CameraFragment : Fragment() {
     }
 
     companion object {
-        private const val RECOGNITION_RESULT_TIMEOUT_MS = 4_000L
+        private const val RECOGNITION_RESULT_TIMEOUT_MS = 1_500L
         private const val ANALYSIS_INTERVAL_MS = 60L
     }
 }

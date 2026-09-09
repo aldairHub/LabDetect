@@ -17,7 +17,6 @@ import java.util.ArrayDeque
 class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssistantRepository {
     private val appContext = context.applicationContext
     private val localManuals = LocalManualRepository(appContext)
-    private val documentIndex = DocumentIndex(appContext)
     private val conversationMemory = AssistantConversationMemory()
 
     override suspend fun ask(
@@ -25,6 +24,9 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         equipmentId: String,
         variantId: String?
     ): String = withContext(Dispatchers.IO) {
+        conversationMemory.cachedAnswerFor(equipmentId, question)?.let {
+            return@withContext it
+        }
         val apiKey = BuildConfig.OPENAI_API_KEY.trim()
         if (apiKey.isBlank() || !hasInternet()) {
             return@withContext localManuals.answerOffline(equipmentId, question)
@@ -35,19 +37,16 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             ?: equipmentId.replace('_', ' ').replaceFirstChar { it.titlecase() }
         val manualText = manual?.fullText?.trim().orEmpty()
 
-        val vectorStoreId = documentIndex.vectorStoreIdFor(equipmentId)
         val conversationContext = conversationMemory.contextFor(equipmentId)
         val manualAnswer = runCatching {
             requestAnswer(
                 apiKey = apiKey,
                 equipmentName = equipmentName,
-                // Con un vector store disponible, File Search es la fuente. No se añade
-                // un resumen genérico que permita responder sin comprobar el manual.
-                manualText = if (vectorStoreId == null) manualText else "",
+                manualText = manualText,
                 question = question.trim(),
                 useWebSearch = false,
-                vectorStoreId = vectorStoreId,
-                conversationContext = conversationContext
+                conversationContext = conversationContext,
+                reasoningEffort = "low"
             )
         }.getOrNull()
         val answerFromManual = manualAnswer
@@ -63,8 +62,8 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
                         manualText = "",
                         question = question.trim(),
                         useWebSearch = true,
-                        vectorStoreId = null,
-                        conversationContext = conversationContext
+                        conversationContext = conversationContext,
+                        reasoningEffort = "medium"
                     )
                 }.getOrElse {
                     "No cuento con esa información dentro de mis manuales y ahora no pude completar una búsqueda en internet."
@@ -93,19 +92,18 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         manualText: String,
         question: String,
         useWebSearch: Boolean,
-        vectorStoreId: String?,
-        conversationContext: String
+        conversationContext: String,
+        reasoningEffort: String
     ): String {
         val sourceRules = if (useWebSearch) {
             """
-            Ya se comprobó que los manuales disponibles no contienen la respuesta. Inicia exactamente con:
-            "No cuento con esa información dentro de mis manuales, pero encontré lo siguiente en internet:"
-            Después responde la pregunta sobre $equipmentName con información técnica comprobable de la búsqueda web.
-            No inventes datos, no cites sitios, enlaces ni fuentes en voz alta y no respondas sobre otro tema.
+            El manual local no contiene suficiente información. Investiga automáticamente en internet antes de responder.
+            Di brevemente que verificaste información adicional en internet, sin pedir permiso ni nombrar fuentes o enlaces.
+            Si preguntan precio, da solo un rango aproximado en USD; nunca combines monedas ni inventes conversiones.
             """.trimIndent()
         } else {
             """
-            ${if (vectorStoreId != null) "El manual recuperado con File Search es la única fuente permitida. Debes usar File Search antes de responder." else "El resumen local incluido es la única fuente permitida. Si está vacío o no contiene la respuesta, devuelve el marcador de información faltante."}
+            El texto local incluido es la única fuente permitida. Si está vacío o no contiene la respuesta, devuelve el marcador de información faltante.
             No inventes botones, valores, pasos o procedimientos específicos del modelo. Si la pregunta
             no trata sobre $equipmentName, responde exactamente: $OUT_OF_SCOPE_MARKER. Si los resultados no dan
             información directa y suficiente para responder, responde únicamente: $MANUAL_INFO_MISSING_MARKER.
@@ -119,7 +117,8 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             sobre este equipo: $equipmentName. Si preguntan por otro tema, responde exactamente: $OUT_OF_SCOPE_MARKER.
             No menciones archivos, fuentes, variantes
             ni procesos internos. No uses Markdown, títulos, viñetas, enlaces ni citas. Responde directamente en
-            una o dos oraciones completas y máximo veintiséis palabras, redactadas para escucharse naturales en voz alta.
+            una o dos oraciones completas de entre doce y veinticuatro palabras, redactadas como una conversación
+            normal: clara, amable y sin frases robóticas ni introducciones largas.
             Nunca dejes una frase, una advertencia o una temperatura a medias. Si preguntan "qué es", "qué veo" o
             "para qué sirve", define primero el equipo completo $equipmentName; no describas una pieza visible ni
             afirmes qué hay en la fotografía, salvo que esa pieza esté identificada explícitamente en el manual.
@@ -131,8 +130,8 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             la intención más probable usando como contexto el equipo $equipmentName y su manual; no menciones la
             transcripción ni sus correcciones. Si aun así hay dos interpretaciones realmente distintas, pide una
             aclaración breve en vez de inventar. Usa el contexto reciente solo si corresponde al mismo equipo para
-            continuar la conversación. Si repiten una pregunta, conserva el dato técnico pero reformúlalo o aporta
-            un matiz útil; no recites literalmente una respuesta anterior.
+            continuar la conversación. Si preguntan precios, responde solo si lo solicitaron explícitamente; usa un
+            único rango aproximado en USD y aclara cuando dependa de marca, capacidad o proveedor.
         """.trimIndent()
         val input = """
             PREGUNTA O TRANSCRIPCIÓN DEL USUARIO:
@@ -148,27 +147,17 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             .put("model", BuildConfig.OPENAI_MODEL)
             .put("instructions", instructions)
             .put("input", input)
-            .put("reasoning", JSONObject().put("effort", "none"))
-            .put("max_output_tokens", 350)
+            .put("reasoning", JSONObject().put("effort", reasoningEffort))
+            .put("max_output_tokens", 180)
             .put("max_tool_calls", 1)
             .put("parallel_tool_calls", false)
             .put("store", false)
         val tools = JSONArray()
-        if (vectorStoreId != null) {
-            tools.put(
-                JSONObject()
-                    .put("type", "file_search")
-                    .put("vector_store_ids", JSONArray().put(vectorStoreId))
-                    .put("max_num_results", 4)
-            )
-        }
         if (useWebSearch) {
             tools.put(JSONObject().put("type", "web_search"))
         }
         if (tools.length() > 0) {
             payload.put("tools", tools)
-            // La primera fase siempre consulta el manual del equipo; la segunda solo
-            // se ejecuta después del marcador de información faltante y fuerza web.
             payload.put("tool_choice", "required")
         }
 
@@ -179,13 +168,12 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
 
         val document = JSONObject(response.second)
         check(document.optString("status") == "completed") { "Respuesta incompleta de OpenAI" }
-        if (tools.length() > 0) {
+        if (useWebSearch) {
             val output = document.optJSONArray("output") ?: JSONArray()
-            val expected = if (useWebSearch) "web_search_call" else "file_search_call"
             check((0 until output.length()).any {
                 val item = output.optJSONObject(it)
-                item?.optString("type") == expected && item.optString("status") == "completed"
-            }) { "La búsqueda requerida no se completó" }
+                item?.optString("type") == "web_search_call" && item.optString("status") == "completed"
+            }) { "La búsqueda web no se completó" }
         }
         val answer = extractOutputText(document)
         if (answer.contains(OUT_OF_SCOPE_MARKER)) return if (useWebSearch) OUT_OF_SCOPE_MESSAGE else OUT_OF_SCOPE_MARKER
@@ -247,6 +235,13 @@ private class AssistantConversationMemory {
             ?.joinToString("\n") { "Usuario: ${it.question}\nAsistente: ${it.answer}" }
             .orEmpty()
             .ifBlank { "No hay conversación anterior." }
+    }
+
+    fun cachedAnswerFor(equipmentId: String, question: String): String? = synchronized(this) {
+        val normalized = question.trim().lowercase()
+        turnsByEquipment[equipmentId]
+            ?.lastOrNull { it.question.trim().lowercase() == normalized }
+            ?.answer
     }
 
     fun remember(equipmentId: String, question: String, answer: String) = synchronized(this) {
