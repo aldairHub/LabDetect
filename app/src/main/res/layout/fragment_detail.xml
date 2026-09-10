@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/lab_surface"
-    android:clipToPadding="false"
-    android:fillViewport="true">
+    android:background="@drawable/bg_page"
+>
+<androidx.core.widget.NestedScrollView android:id="@+id/detailScroll" android:layout_width="0dp" android:layout_height="0dp" android:fillViewport="true" android:clipToPadding="false" app:layout_constraintWidth_max="720dp" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="14dp"
-        android:paddingTop="14dp"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp"
         android:paddingBottom="32dp">
 
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:layout_marginBottom="12dp">
+<androidx.appcompat.widget.AppCompatImageButton android:id="@+id/btnBack" style="@style/LabGlassIcon" app:srcCompat="@drawable/ic_back" android:contentDescription="Volver a la cámara"/>
+<TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Bromatología · UTEQ" android:textColor="@color/lab_text" android:textSize="16sp" android:fontFamily="sans-serif-medium"/>
+</LinearLayout>
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -25,7 +29,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_detail_hero"
+                android:background="@drawable/bg_glass"
                 android:orientation="vertical"
                 android:padding="20dp">
 
@@ -56,14 +60,15 @@
                         android:fontFamily="sans-serif-medium"
                         android:text="Detalle del equipo"
                         android:textColor="@color/white"
-                        android:textSize="27sp"
+                        android:textSize="25sp"
                         android:textStyle="bold" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFavorite"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                         android:layout_width="wrap_content"
-                        android:layout_height="44dp"
+                        android:layout_height="wrap_content"
+ android:minHeight="48dp"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="Guardar"
@@ -122,7 +127,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="@color/lab_card"
+            app:cardBackgroundColor="#E61B2922"
             app:cardCornerRadius="24dp"
             app:cardElevation="0dp"
             app:strokeColor="@color/lab_divider"
@@ -157,8 +162,8 @@
                         android:background="@drawable/bg_offline_pill"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="6dp"
-                        android:text="Sin conexión"
-                        android:textColor="@color/lab_teal_dark"
+                        android:text="Manual local"
+                        android:textColor="@color/lab_teal"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -189,7 +194,8 @@
                             android:id="@+id/btnQuickPurpose"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="42dp"
+                            android:layout_height="wrap_content"
+ android:minHeight="48dp"
                             android:layout_weight="1"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
@@ -205,7 +211,8 @@
                             android:id="@+id/btnQuickBeforeUse"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="42dp"
+                            android:layout_height="wrap_content"
+ android:minHeight="48dp"
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:insetTop="0dp"
@@ -229,7 +236,8 @@
                             android:id="@+id/btnQuickSafety"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="42dp"
+                            android:layout_height="wrap_content"
+ android:minHeight="48dp"
                             android:layout_weight="1"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
@@ -245,7 +253,8 @@
                             android:id="@+id/btnQuickFinish"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="42dp"
+                            android:layout_height="wrap_content"
+ android:minHeight="48dp"
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:insetTop="0dp"
@@ -263,11 +272,12 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnOpenManual"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
+                    android:layout_height="wrap_content"
+ android:minHeight="52dp"
                     android:layout_marginTop="14dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Consultar ficha offline"
+                    android:text="Abrir manual local"
                     android:textAllCaps="false"
                     android:textColor="@color/lab_navy"
                     android:textStyle="bold"
@@ -285,7 +295,7 @@
                     android:layout_marginTop="4dp"
                     android:text="Consultar manual oficial"
                     android:textAllCaps="false"
-                    android:textColor="@color/lab_violet"
+                    android:textColor="@color/lab_teal"
                     android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -294,7 +304,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="@color/lab_card"
+            app:cardBackgroundColor="#E61B2922"
             app:cardCornerRadius="24dp"
             app:cardElevation="0dp"
             app:strokeColor="@color/lab_divider"
@@ -328,8 +338,8 @@
                         android:background="@drawable/bg_status_pill"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="6dp"
-                        android:text="IA"
-                        android:textColor="@color/lab_teal_dark"
+                        android:text="Consulta"
+                        android:textColor="@color/lab_teal"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -370,15 +380,16 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnAsk"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
+                    android:layout_height="wrap_content"
+ android:minHeight="52dp"
                     android:layout_marginTop="10dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Preguntar al asistente"
+                    android:text="Enviar pregunta"
                     android:textAllCaps="false"
-                    android:textColor="@color/white"
+                    android:textColor="@color/lab_navy"
                     android:textStyle="bold"
-                    app:backgroundTint="@color/lab_violet"
+                    app:backgroundTint="@color/lab_teal"
                     app:cornerRadius="17dp"
                     app:icon="@drawable/ic_send"
                     app:iconGravity="textStart"
@@ -409,7 +420,8 @@
                     android:id="@+id/btnQuestionHistory"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="42dp"
+                    android:layout_height="wrap_content"
+ android:minHeight="48dp"
                     android:layout_marginTop="4dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
@@ -422,7 +434,8 @@
                     android:id="@+id/btnReportMissing"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
+                    android:layout_height="wrap_content"
+ android:minHeight="48dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="Me faltó información"
@@ -433,3 +446,4 @@
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
+</androidx.constraintlayout.widget.ConstraintLayout>

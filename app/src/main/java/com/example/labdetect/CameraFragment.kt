@@ -42,6 +42,8 @@ import androidx.navigation.fragment.findNavController
 import com.example.labdetect.data.FavoriteEquipmentStore
 import com.example.labdetect.data.EquipmentInteractionStore
 import com.example.labdetect.data.LocalEquipmentCatalog
+import com.example.labdetect.data.LocalManualRepository
+import com.example.labdetect.domain.ClassificationResult
 import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.speech.AndroidSpeechEngine
 import com.example.labdetect.viewmodel.CameraViewModel
@@ -78,6 +80,12 @@ class CameraFragment : Fragment() {
     private var activeQuestionFrame: Bitmap? = null
     private var lastSubmittedQuestion: String = ""
     private var lastRememberedEquipmentId: String? = null
+    private lateinit var manualRepository: LocalManualRepository
+    private var cardTarget: ClassificationResult? = null
+    private var keyboardVisible = false
+    private var dismissedCardId: String? = null
+    private var latestBackdrop: Bitmap? = null
+    private var lastBackdropAt = 0L
     private val feedbackShownFor = mutableSetOf<String>()
 
     private enum class VoiceState { IDLE, LISTENING, READY_TO_SEND, AWAITING_RESULT, PROCESSING, SPEAKING }
@@ -113,27 +121,41 @@ class CameraFragment : Fragment() {
         favoriteStore = FavoriteEquipmentStore(requireContext())
         interactionStore = EquipmentInteractionStore(requireContext())
         equipmentCatalog = LocalEquipmentCatalog(requireContext())
+        manualRepository = LocalManualRepository(requireContext())
         defaultMicTint = binding.fabMic.backgroundTintList
         configureSpeechRecognizer()
 
         binding.fabMic.isEnabled = true
         requestMissingPermissions()
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val keyboard = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            keyboardVisible = keyboard
+            binding.tvQuestionPrompt.isVisible = !keyboard && viewModel.classificationResult.value != null && voiceState == VoiceState.IDLE
+            binding.answerCard.isVisible = !keyboard && cardTarget != null && dismissedCardId != cardTarget?.canonicalId &&
+                (viewModel.classificationResult.value != null || voiceState != VoiceState.IDLE)
+            if (keyboard) binding.conversationScroll.post { _binding?.conversationScroll?.fullScroll(View.FOCUS_DOWN) }
+            insets
+        }
 
         binding.btnDetails.setOnClickListener { openCurrentEquipmentDetails() }
-        binding.btnQuickFavorite.setOnClickListener { toggleCurrentFavorite() }
+        binding.tvCameraAnswer.setOnClickListener {
+            LabSheets.reader(requireContext(), cardTarget?.label ?: "Equipo",
+                binding.tvCameraAnswer.text.toString(), "Información de esta conversación")
+        }
         binding.btnFavoritesList.setOnClickListener { showFavorites() }
         binding.btnFeedbackYes.setOnClickListener { saveDetectionFeedback(null) }
         binding.btnFeedbackCorrect.setOnClickListener { showCorrectionPicker() }
         binding.fabMic.setOnClickListener { handleMicClick() }
         binding.btnSendQuestion.setOnClickListener { submitTypedQuestion() }
         binding.btnDismissAnswer.setOnClickListener {
-            binding.tvCameraAnswer.isVisible = false
-            binding.btnDismissAnswer.isVisible = false
+            dismissedCardId = cardTarget?.canonicalId
+            binding.answerCard.isVisible = false
         }
         binding.viewFinder.setOnTouchListener { viewFinder, event ->
             if (event.action == MotionEvent.ACTION_UP) {
                 viewFinder.performClick()
                 focusAndMeterAt(event.x, event.y)
+                binding.detectionOverlay.showFocus(event.x, event.y)
             }
             true
         }
@@ -145,22 +167,38 @@ class CameraFragment : Fragment() {
         }
 
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
+            binding.tvScanStatus.isVisible = result == null
+            binding.tvQuestionPrompt.isVisible = !keyboardVisible && result != null && voiceState == VoiceState.IDLE
             if (result == null) {
-                binding.resultCard.isVisible = false
-            } else {
-                val animateEntrance = !binding.resultCard.isVisible
-                binding.resultCard.isVisible = true
-                binding.tvEquipmentName.text = result.label
-                binding.tvConfidence.text = "${"%.1f".format(result.confidence)}% de confianza"
-                updateQuickFavorite(result.canonicalId)
+                if (voiceState == VoiceState.IDLE) binding.answerCard.isVisible = false
+            } else if (voiceState == VoiceState.IDLE) {
+                binding.tvQuestionPrompt.text = "¿Qué deseas saber de este equipo?"
+                if (cardTarget?.canonicalId != result.canonicalId) {
+                    cardTarget = result
+                    dismissedCardId = null
+                    binding.tvCameraAnswer.text = manualRepository.find(result.canonicalId)?.function
+                        ?.substringBefore(". ")?.let { it.trimEnd('.') + "." }
+                        ?: "Consulta la ficha de ${result.label.lowercase()}."
+                    binding.tvCameraAnswer.isVisible = true
+                    val thumbnail = captureEquipmentThumbnail()
+                    binding.ivEquipmentThumb.setImageBitmap(thumbnail)
+                    if (thumbnail != null) {
+                        val directory = java.io.File(requireContext().filesDir, "equipment-thumbnails")
+                        cameraAnalysisExecutor.execute {
+                            runCatching {
+                                directory.mkdirs()
+                                java.io.File(directory, "${result.canonicalId}.jpg").outputStream().use {
+                                    thumbnail.compress(Bitmap.CompressFormat.JPEG, 85, it)
+                                }
+                            }
+                        }
+                    }
+                    binding.root.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                }
+                binding.answerCard.isVisible = !keyboardVisible && dismissedCardId != result.canonicalId
                 if (lastRememberedEquipmentId != result.canonicalId) {
                     interactionStore.rememberSeen(result.canonicalId)
                     lastRememberedEquipmentId = result.canonicalId
-                }
-                if (animateEntrance) {
-                    binding.resultCard.alpha = 0f
-                    binding.resultCard.translationY = -8f * resources.displayMetrics.density
-                    binding.resultCard.animate().alpha(1f).translationY(0f).setDuration(220L).start()
                 }
             }
         }
@@ -170,7 +208,11 @@ class CameraFragment : Fragment() {
         }
 
         viewModel.scannerStatus.observe(viewLifecycleOwner) { status ->
-            binding.tvScanStatus.text = status
+            binding.tvScanStatus.text = when {
+                status.contains("AJUSTANDO") -> "Reconociendo equipo…"
+                status.contains("MODELO") -> "Detector no disponible"
+                else -> "Apunta a un equipo del laboratorio"
+            }
         }
 
         viewModel.modelReady.observe(viewLifecycleOwner) { ready ->
@@ -194,7 +236,10 @@ class CameraFragment : Fragment() {
             val answer = event.consume() ?: return@observe
             binding.tvCameraAnswer.text = answer
             binding.tvCameraAnswer.isVisible = true
-            binding.btnDismissAnswer.isVisible = true
+            binding.answerCard.isVisible = !keyboardVisible
+            cardTarget = activeQuestionEquipmentId?.let {
+                ClassificationResult(it, activeQuestionEquipmentName ?: "Equipo", 0f)
+            } ?: cardTarget
             binding.tvCameraAnswer.alpha = 0f
             binding.tvCameraAnswer.translationY = 8f * resources.displayMetrics.density
             binding.tvCameraAnswer.animate()
@@ -317,7 +362,7 @@ class CameraFragment : Fragment() {
             return
         }
         setActiveQuestionEquipment()
-        binding.tvCameraAnswer.isVisible = false
+        binding.answerCard.isVisible = false
         binding.btnSendQuestion.isEnabled = false
         partialTranscript = ""
         pendingTranscript = ""
@@ -361,6 +406,7 @@ class CameraFragment : Fragment() {
             resetMicVisual(sendMode = true)
             showVoiceState("Voz capturada · toca para enviar")
             binding.tvMicHint.text = text.take(72)
+            binding.tvMicHint.isVisible = true
         }
     }
 
@@ -427,6 +473,7 @@ class CameraFragment : Fragment() {
         binding.fabMic.scaleX = 1.1f
         binding.fabMic.scaleY = 1.1f
         binding.tvMicHint.text = "Habla con normalidad · toca otra vez al terminar"
+        binding.tvMicHint.isVisible = true
     }
 
     private fun resetMicVisual(sendMode: Boolean = false) {
@@ -467,6 +514,7 @@ class CameraFragment : Fragment() {
         binding.fabMic.isEnabled = true
         binding.btnSendQuestion.isEnabled = true
         binding.tvMicHint.text = "Toca para hablar · toca de nuevo para enviar"
+        binding.tvMicHint.isVisible = false
         hideVoiceState()
         if (cancelled) viewModel.cancelQuestionSession() else viewModel.endQuestionSession()
     }
@@ -493,7 +541,7 @@ class CameraFragment : Fragment() {
     }
 
     private fun openCurrentEquipmentDetails() {
-        val result = viewModel.classificationResult.value ?: return
+        val result = cardTarget ?: viewModel.classificationResult.value ?: return
         findNavController().navigate(
             R.id.action_cameraFragment_to_detailFragment,
             Bundle().apply {
@@ -503,51 +551,35 @@ class CameraFragment : Fragment() {
         )
     }
 
-    private fun toggleCurrentFavorite() {
-        val id = viewModel.classificationResult.value?.canonicalId ?: return
-        favoriteStore.toggle(id)
-        updateQuickFavorite(id)
-    }
-
-    private fun updateQuickFavorite(id: String) {
-        val isFavorite = favoriteStore.contains(id)
-        binding.btnQuickFavorite.setIconResource(
-            if (isFavorite) R.drawable.ic_star_filled else R.drawable.ic_star_outline
-        )
+    private fun captureEquipmentThumbnail(): Bitmap? {
+        val source = latestBackdrop ?: return null
+        val detection = viewModel.detections.value?.firstOrNull { it.confirmed } ?: return source
+        val left = (detection.left * source.width).toInt().coerceIn(0, source.width - 1)
+        val top = (detection.top * source.height).toInt().coerceIn(0, source.height - 1)
+        val right = (detection.right * source.width).toInt().coerceIn(left + 1, source.width)
+        val bottom = (detection.bottom * source.height).toInt().coerceIn(top + 1, source.height)
+        return Bitmap.createBitmap(source, left, top, right - left, bottom - top)
     }
 
     private fun showFavorites() {
         val favorites = favoriteStore.all().mapNotNull(equipmentCatalog::find).sortedBy { it.displayName }
         val recent = interactionStore.recentEquipmentIds().mapNotNull(equipmentCatalog::find)
         val profiles = (favorites + recent).distinctBy { it.id }
-        if (profiles.isEmpty()) {
-            Toast.makeText(context, "Aún no tienes equipos recientes ni favoritos.", Toast.LENGTH_SHORT).show()
-            return
+        LabSheets.favorites(requireContext(), profiles, favoriteStore::contains) { profile ->
+            findNavController().navigate(R.id.action_cameraFragment_to_detailFragment, Bundle().apply {
+                putString("equipmentName", profile.displayName)
+                putString("equipmentId", profile.id)
+            })
         }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Favoritos y recientes")
-            .setItems(profiles.map { profile ->
-                val prefix = if (favoriteStore.contains(profile.id)) "★ " else "◷ "
-                prefix + profile.displayName
-            }.toTypedArray()) { _, index ->
-                val profile = profiles[index]
-                findNavController().navigate(
-                    R.id.action_cameraFragment_to_detailFragment,
-                    Bundle().apply {
-                        putString("equipmentName", profile.displayName)
-                        putString("equipmentId", profile.id)
-                    }
-                )
-            }
-            .setNegativeButton("Cerrar", null)
-            .show()
     }
-
     private fun setActiveQuestionEquipment() {
         val result = viewModel.classificationResult.value ?: return
         activeQuestionEquipmentId = result.canonicalId
         activeQuestionEquipmentName = result.label
         activeQuestionFrame = binding.viewFinder.bitmap?.copy(Bitmap.Config.ARGB_8888, false)
+        binding.ivEquipmentThumb.setImageBitmap(captureEquipmentThumbnail())
+        binding.tvQuestionPrompt.isVisible = false
+        binding.root.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
         binding.feedbackBar.isVisible = false
     }
 
@@ -657,8 +689,17 @@ class CameraFragment : Fragment() {
             bitmap.let {
                 val frameWidth = it.width
                 val frameHeight = it.height
+                val backdrop = if (now - lastBackdropAt >= 800L) {
+                    lastBackdropAt = now
+                    Bitmap.createScaledBitmap(it, 120, (120f * frameHeight / frameWidth).toInt().coerceAtLeast(1), true)
+                } else null
                 mainHandler.post {
                     _binding?.detectionOverlay?.setSourceFrameSize(frameWidth, frameHeight)
+                    if (backdrop != null && _binding != null) {
+                        latestBackdrop = backdrop
+                        binding.answerCard.setBackdrop(backdrop)
+                        binding.conversationCard.setBackdrop(backdrop)
+                    }
                 }
                 viewModel.onImageCaptured(it)
             }
@@ -712,6 +753,9 @@ class CameraFragment : Fragment() {
         speechEngine.close()
         viewModel.endQuestionSession()
         activeCamera = null
+        latestBackdrop = null
+        cardTarget = null
+        keyboardVisible = false
         _binding = null
         super.onDestroyView()
     }

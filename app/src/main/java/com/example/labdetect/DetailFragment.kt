@@ -48,6 +48,7 @@ class DetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.btnBack.setOnClickListener { androidx.navigation.fragment.NavHostFragment.findNavController(this).navigateUp() }
         speechEngine = AndroidSpeechEngine(requireContext())
         favoriteStore = FavoriteEquipmentStore(requireContext())
         interactionStore = EquipmentInteractionStore(requireContext())
@@ -167,7 +168,6 @@ class DetailFragment : Fragment() {
         )
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(manual.displayName)
-            .setMessage("Elige solo la parte que necesitas consultar.")
             .setItems(options.toTypedArray()) { _, position ->
                 val title = options[position]
                 val content = when (position) {
@@ -177,26 +177,14 @@ class DetailFragment : Fragment() {
                     3 -> manual.safety
                     else -> manual.maintenance
                 }
-                showOfflineSection(title, concise(content))
+                showOfflineSection(title, content)
             }
             .setNegativeButton("Cerrar", null)
             .show()
     }
 
     private fun showOfflineSection(title: String, sectionContent: String) {
-        val bodyView = TextView(requireContext()).apply {
-            text = sectionContent.ifBlank { "Esta sección todavía no está disponible para este equipo." }
-            textSize = 15f
-            setTextIsSelectable(true)
-            val padding = (20 * resources.displayMetrics.density).toInt()
-            setPadding(padding, padding, padding, padding)
-        }
-        val scroll = ScrollView(requireContext()).apply { addView(bodyView) }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(title)
-            .setView(scroll)
-            .setPositiveButton("Cerrar", null)
-            .show()
+        LabSheets.reader(requireContext(), title, sectionContent)
     }
 
     private fun showProcedureGuide(manual: LocalManual) {

@@ -1,0 +1,12 @@
+<resources>
+<style name="LabGlassIcon" parent="Widget.AppCompat.ImageButton">
+<item name="android:layout_width">48dp</item><item name="android:layout_height">48dp</item>
+<item name="android:minWidth">0dp</item><item name="android:padding">12dp</item><item name="android:insetTop">0dp</item><item name="android:insetBottom">0dp</item>
+<item name="android:background">?attr/selectableItemBackgroundBorderless</item><item name="tint">@color/lab_text</item><item name="android:scaleType">fitCenter</item>
+</style>
+<style name="LabGlassDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+<item name="colorSurface">#15231D</item><item name="colorOnSurface">@color/lab_text</item><item name="colorPrimary">@color/lab_teal</item>
+<item name="shapeAppearanceMediumComponent">@style/LabRoundedShape</item>
+</style>
+<style name="LabRoundedShape" parent="ShapeAppearance.Material3.Corner.Medium"><item name="cornerSize">24dp</item></style>
+</resources>

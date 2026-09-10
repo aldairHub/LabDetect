@@ -13,6 +13,7 @@
         <item name="android:statusBarColor">@color/lab_navy</item>
         <item name="android:navigationBarColor">@color/lab_navy</item>
         <item name="android:fontFamily">sans</item>
+        <item name="materialAlertDialogTheme">@style/LabGlassDialog</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
