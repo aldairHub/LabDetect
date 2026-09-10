@@ -105,6 +105,64 @@ class RecoveryRegressionTest {
         assertNotNull(model.classificationResult.value)
     }
 
+    @Test fun boxesAndLabelsRequireTwoMatchingFrames() {
+        val detector = FakeDetector().apply { output = listOf(detection) }
+        val model = CameraViewModel(app, detector)
+        model.resumeDetection()
+        frame(model)
+        assertTrue("One frame must not draw a box", model.detections.value!!.isEmpty())
+        assertNull(model.classificationResult.value)
+        frame(model)
+        assertNotNull(model.classificationResult.value)
+        detector.output = emptyList()
+        frame(model)
+        assertTrue("Lost equipment must disappear immediately", model.detections.value!!.isEmpty())
+        detector.output = listOf(detection.copy(confidence = 75f))
+        frame(model)
+        assertTrue(model.detections.value!!.isEmpty())
+        detector.output = listOf(detection)
+        frame(model)
+        assertFalse(model.detections.value!!.single().confirmed)
+        assertNull("Both frames need high confidence for a name", model.classificationResult.value)
+        frame(model)
+        assertNotNull(model.classificationResult.value)
+        detector.output = listOf(detection.copy(canonicalId = "cabina", label = "Cabina"))
+        frame(model)
+        assertTrue("Different classes cannot confirm each other", model.detections.value!!.isEmpty())
+        assertNull(model.classificationResult.value)
+        model.pauseDetection()
+    }
+
+    @Test fun cameraStartsWithExistingPermissionOnEveryResume() {
+        val voice = java.io.File(app.filesDir, "voices/piper-daniela-int8")
+        voice.mkdirs()
+        java.io.File(voice, "es_AR-daniela-high.onnx").createNewFile()
+        java.io.File(voice, "tokens.txt").createNewFile()
+        java.io.File(voice, "espeak-ng-data").mkdirs()
+        shadowOf(app).grantPermissions(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        val controller = Robolectric.buildActivity(HostActivity::class.java).setup()
+        val fragment = CameraFragment()
+        CameraFragment::class.java.getDeclaredField("viewModel" + '$' + "delegate").apply {
+            isAccessible = true
+            set(fragment, lazyOf(CameraViewModel(app, FakeDetector())))
+        }
+        val starting = CameraFragment::class.java.getDeclaredField("cameraStarting").apply { isAccessible = true }
+        try {
+            controller.get().supportFragmentManager.beginTransaction()
+                .add(android.R.id.content, fragment).commitNow()
+            assertFalse(fragment.requireView().findViewById<android.view.View>(R.id.viewFinder).isLaidOut)
+            assertTrue("Resume must schedule startup before waiting for preview layout", starting.getBoolean(fragment))
+            repeat(3) {
+                controller.pause().stop()
+                assertFalse(starting.getBoolean(fragment))
+                controller.start().resume()
+                assertTrue("Reopen must schedule a fresh camera session", starting.getBoolean(fragment))
+            }
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
     @Test fun microphoneAndFragmentRecoverAfterLeavingAndReopening() {
         // Installation isn't part of this lifecycle test; avoid unpacking the bundled voice.
         val voice = java.io.File(app.filesDir, "voices/piper-daniela-int8")

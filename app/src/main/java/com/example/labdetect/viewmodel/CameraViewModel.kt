@@ -79,13 +79,17 @@ class CameraViewModel @JvmOverloads constructor(
                     val confirmed = candidates.filter { candidate ->
                         if (candidate.confidence < MIN_CONFIRMED_CONFIDENCE) return@filter false
                         val matchesPrevious = previousFrameDetections.any { previous ->
-                            previous.confidence >= MIN_PREVIOUS_CONFIDENCE &&
+                            previous.confidence >= MIN_CONFIRMED_CONFIDENCE &&
                                 isSameEquipment(candidate, previous)
                         }
                         matchesPrevious
                     }
+                    val preview = candidates.filter { candidate ->
+                        candidate.confidence >= MIN_PREVIEW_CONFIDENCE && previousFrameDetections.any { previous ->
+                            previous.confidence >= MIN_PREVIEW_CONFIDENCE && isSameEquipment(candidate, previous)
+                        }
+                    }
                     previousFrameDetections = candidates
-                    val preview = candidates.filter { it.confidence >= MIN_PREVIEW_CONFIDENCE }
                     _detections.value =
                         if (confirmed.isNotEmpty()) confirmed.map { it.copy(confirmed = true) } else preview
 
@@ -250,7 +254,6 @@ class CameraViewModel @JvmOverloads constructor(
         private const val MIN_CANDIDATE_CONFIDENCE = 60f
         private const val MIN_PREVIEW_CONFIDENCE = 70f
         private const val MIN_CONFIRMED_CONFIDENCE = 85f
-        private const val MIN_PREVIOUS_CONFIDENCE = 70f
         private const val STABLE_BOX_IOU = 0.28f
         private const val STABLE_CENTER_DISTANCE = 0.18f
         private const val CENTER_CROP_EVERY_N_FRAMES = 3

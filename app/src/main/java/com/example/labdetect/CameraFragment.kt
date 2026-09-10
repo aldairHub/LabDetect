@@ -32,6 +32,8 @@ import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import android.os.Build
 import android.provider.Settings
 import android.net.Uri
@@ -149,6 +151,15 @@ class CameraFragment : Fragment() {
                 renderScannerStatus()
             }
         }
+        // En lugar de usar onResume, usamos onStart para evitar la condición de carrera
+        // de Lifecycle.State.RESUMED en startCamera().
+        viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                cameraRetries = 0
+                if (cameraPermissionGranted()) startCamera()
+                else showCameraIssue("Permiso de cámara pendiente · toca para habilitar")
+            }
+        })
         requestMissingPermissions()
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val keyboard = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
@@ -745,7 +756,9 @@ class CameraFragment : Fragment() {
 
     private fun startCamera() {
         val current = _binding ?: return
-        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !cameraPermissionGranted() ||
+        // Cambiamos isAtLeast(RESUMED) a STARTED para coincidir con onStart y que 
+        // la cámara pueda iniciar correctamente al regresar a la app.
+        if (!viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || !cameraPermissionGranted() ||
             cameraStarting || activeCamera != null) return
         cameraStarting = true
         val session = ++cameraGeneration
@@ -755,7 +768,7 @@ class CameraFragment : Fragment() {
             val future = ProcessCameraProvider.getInstance(requireContext())
             future.addListener({
                 if (_binding !== current || session != cameraGeneration ||
-                    !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@addListener
+                    !viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@addListener
                 try {
                     val provider = future.get()
                     cameraProvider = provider
@@ -793,7 +806,7 @@ class CameraFragment : Fragment() {
                     }
                     cameraWatchdog = Runnable {
                         if (_binding === current && session == cameraGeneration &&
-                            lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                            viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
                             current.viewFinder.previewStreamState.value != PreviewView.StreamState.STREAMING) {
                             recoverCamera()
                         }
@@ -808,7 +821,7 @@ class CameraFragment : Fragment() {
 
     private fun recoverCamera() {
         releaseCamera()
-        if (_binding == null || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+        if (_binding == null || !viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         if (cameraRetries++ < 2 && cameraPermissionGranted()) {
             val session = cameraGeneration
             mainHandler.postDelayed({
@@ -909,13 +922,6 @@ class CameraFragment : Fragment() {
         requireContext(),
         Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED
-
-    override fun onResume() {
-        super.onResume()
-        cameraRetries = 0
-        if (cameraPermissionGranted()) startCamera()
-        else showCameraIssue("Permiso de cámara pendiente · toca para habilitar")
-    }
 
     override fun onPause() {
         if (cameraStarting) releaseCamera()
