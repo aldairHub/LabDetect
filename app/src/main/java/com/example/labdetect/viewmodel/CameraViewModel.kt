@@ -61,8 +61,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 // La ampliación central es útil para equipos lejanos, pero cuesta una
                 // segunda inferencia completa. Se hace cada tres análisis, no en cada
                 // fotograma sin detección; el objeto cercano sigue apareciendo enseguida.
-                val allowCenterCrop = previousFrameDetections.isNotEmpty() ||
-                    ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
+                val allowCenterCrop = ++analyzedFrames % CENTER_CROP_EVERY_N_FRAMES == 0
                 val results = detector.detect(bitmap, allowCenterCrop)
                 val candidates = results.filter { it.confidence >= MIN_CANDIDATE_CONFIDENCE }
                 if (candidates.isNotEmpty()) {
@@ -202,9 +201,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     companion object {
-        // Dos ausencias seguidas quitan inmediatamente una detección que ya salió de
-        // cámara, sin provocar parpadeos por una imagen borrosa aislada.
-        private const val MISSES_BEFORE_CLEAR = 2
+        // Una ausencia real basta: la etiqueta no debe quedarse sobre una escena que
+        // ya no contiene el equipo. El detector ya exige dos fotogramas estables para
+        // confirmar una etiqueta, por lo que esta salida rápida no vuelve inestable
+        // el reconocimiento.
+        private const val MISSES_BEFORE_CLEAR = 1
         private const val MIN_CANDIDATE_CONFIDENCE = 60f
         private const val MIN_PREVIEW_CONFIDENCE = 70f
         private const val MIN_CONFIRMED_CONFIDENCE = 85f
