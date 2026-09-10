@@ -200,6 +200,7 @@ class CameraFragment : Fragment() {
             } else false
         }
 
+        // --- SOLUCIÓN PARA LA PREGUNTA: PAUSAR EL ESCÁNER AL HABLAR O AL ABRIR UN DETALLE ---
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
             binding.tvScanStatus.isVisible = result == null || cameraIssue != null
             binding.tvQuestionPrompt.isVisible = !keyboardVisible && result != null && voiceState == VoiceState.IDLE
@@ -213,6 +214,14 @@ class CameraFragment : Fragment() {
                     binding.tvCameraAnswer.text = manualRepository.find(result.canonicalId)?.function
                         ?.substringBefore(". ")?.let { it.trimEnd('.') + "." }
                         ?: "Consulta la ficha de ${result.label.lowercase()}."
+                        
+                    // Asegurarse de que no haya markdown en la respuesta por defecto
+                    val cleanedText = binding.tvCameraAnswer.text.toString()
+                        .replace(Regex("\\[(.*?)]\\((.*?)\\)"), "$1")
+                        .replace("**", "")
+                        .replace("*", "")
+                    binding.tvCameraAnswer.text = cleanedText
+                    
                     binding.tvCameraAnswer.isVisible = true
                     val thumbnail = captureEquipmentThumbnail()
                     binding.ivEquipmentThumb.setImageBitmap(thumbnail)
@@ -262,7 +271,14 @@ class CameraFragment : Fragment() {
 
         viewModel.assistantAnswer.observe(viewLifecycleOwner) { event ->
             val answer = event.consume() ?: return@observe
-            binding.tvCameraAnswer.text = answer
+            
+            // Remover Markdown de la respuesta que viene del asistente
+            val cleanedAnswer = answer
+                .replace(Regex("\\[(.*?)]\\((.*?)\\)"), "$1")
+                .replace("**", "")
+                .replace("*", "")
+                
+            binding.tvCameraAnswer.text = cleanedAnswer
             binding.tvCameraAnswer.isVisible = true
             binding.answerCard.isVisible = !keyboardVisible
             cardTarget = activeQuestionEquipmentId?.let {
@@ -599,8 +615,18 @@ class CameraFragment : Fragment() {
     private fun showVoiceState(message: String) {
         if (_binding == null) return
         val animateEntrance = !binding.tvVoiceState.isVisible
-        binding.tvVoiceState.text = message
+        
+        // Remove markdown formatting from the message to prevent exposing markdown characters in the UI
+        val displayMessage = message.replace(Regex("\\[(.*?)]\\((.*?)\\)"), "$1")
+            .replace("**", "")
+            .replace("*", "")
+            
+        binding.tvVoiceState.text = displayMessage
         binding.tvVoiceState.isVisible = true
+        
+        // Pausar la detección de cámara mientras hay interacciones
+        binding.detectionOverlay.isEnabled = false
+        
         if (animateEntrance) {
             binding.tvVoiceState.alpha = 0f
             binding.tvVoiceState.scaleX = 0.94f
@@ -612,6 +638,8 @@ class CameraFragment : Fragment() {
     private fun hideVoiceState() {
         if (_binding == null) return
         binding.tvVoiceState.isVisible = false
+        // Reanudar la detección
+        binding.detectionOverlay.isEnabled = true
     }
 
     private fun finishInteraction(cancelled: Boolean = false) {
