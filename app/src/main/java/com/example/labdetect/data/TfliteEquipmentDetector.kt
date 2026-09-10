@@ -23,6 +23,7 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
     private val outputShape: IntArray
     private val inputSize: Int
     private val classes: List<EquipmentClass>
+    private var closed = false
     private val reusableInput by lazy {
         ByteBuffer.allocateDirect(interpreter!!.getInputTensor(0).numBytes()).order(ByteOrder.nativeOrder())
     }
@@ -61,7 +62,9 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         outputShape = created?.getOutputTensor(0)?.shape() ?: intArrayOf()
     }
 
+    @Synchronized
     override fun detect(bitmap: Bitmap, allowCenterCrop: Boolean): List<Detection> {
+        if (closed) return emptyList()
         val fullFrame = detectFrame(bitmap)
         // Una señal débil no debe impedir el acercamiento al centro. Así, un equipo
         // lejano puede pasar de candidato a detección válida sin aceptar esa señal
@@ -295,8 +298,12 @@ class TfliteEquipmentDetector(context: Context) : EquipmentDetector {
         .order(ByteOrder.nativeOrder())
         .apply { put(this@toDirectBuffer); rewind() }
 
+    @Synchronized
     override fun close() {
-        interpreter?.close()
+        if (!closed) {
+            closed = true
+            interpreter?.close()
+        }
     }
 
     private data class EquipmentClass(val id: String, val label: String)

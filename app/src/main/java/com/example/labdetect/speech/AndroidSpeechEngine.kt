@@ -32,7 +32,7 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     }
 
     override fun onInit(status: Int) {
-        if (status != TextToSpeech.SUCCESS) return
+        if (closed || status != TextToSpeech.SUCCESS) return
         val bestVoice = fallbackTts.voices.orEmpty()
             .filter { it.locale.language == "es" }
             .minWithOrNull(
@@ -90,15 +90,19 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun close() {
+        if (closed) return
         closed = true
         generation++
-        executor.shutdownNow()
-        piperTts.close()
-        stopPlayback(completePrevious = true)
+        onFinished = null
+        mainHandler.removeCallbacksAndMessages(null)
+        executor.execute { piperTts.close() }
+        executor.shutdown()
+        stopPlayback(completePrevious = false)
         fallbackTts.shutdown()
     }
 
     private fun playAudio(file: java.io.File, fallbackText: String, requestGeneration: Int) {
+        try {
         player = MediaPlayer().apply {
             setDataSource(file.absolutePath)
             setOnPreparedListener { mediaPlayer ->
@@ -119,16 +123,23 @@ class AndroidSpeechEngine(context: Context) : TextToSpeech.OnInitListener {
             }
             prepareAsync()
         }
+        } catch (_: Exception) {
+            runCatching { player?.release() }
+            player = null
+            file.delete()
+            if (!closed && requestGeneration == generation) speakWithFallback(fallbackText, requestGeneration)
+        }
     }
 
     private fun speakWithFallback(text: String, requestGeneration: Int) {
         if (fallbackReady && !closed && requestGeneration == generation) {
-            fallbackTts.speak(
+            val result = fallbackTts.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 "$UTTERANCE_PREFIX$requestGeneration"
             )
+            if (result == TextToSpeech.ERROR) completeSpeech()
         } else {
             completeSpeech()
         }

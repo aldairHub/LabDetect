@@ -27,11 +27,13 @@ internal class PiperSpeechEngine(context: Context) {
     private val installer = Executors.newSingleThreadExecutor()
     private val engineLock = Any()
     private var engine: OfflineTts? = null
+    @Volatile private var closed = false
 
     fun synthesizeIfInstalled(text: String): File? {
-        if (!isInstalled() || text.isBlank()) return null
+        if (closed || !isInstalled() || text.isBlank()) return null
         return runCatching {
             synchronized(engineLock) {
+                if (closed) return null
                 val audio = (engine ?: createEngine().also { engine = it })
                     .generate(text.trim(), speed = 1.0f)
                 File.createTempFile("labdetect-piper-", ".wav", appContext.cacheDir).also {
@@ -43,14 +45,19 @@ internal class PiperSpeechEngine(context: Context) {
 
     /** Extrae silenciosamente la voz incluida en la APK; nunca frena una respuesta. */
     fun prepareForOfflineUse() {
-        if (isInstalled() || !installing.compareAndSet(false, true)) return
+        if (closed || isInstalled() || !installing.compareAndSet(false, true)) return
         installer.execute {
-            runCatching { installVoicePack() }
+            runCatching {
+                synchronized(installationLock) {
+                    if (!closed && !isInstalled()) installVoicePack()
+                }
+            }
             installing.set(false)
         }
     }
 
     fun close() {
+        closed = true
         installer.shutdownNow()
         synchronized(engineLock) {
             engine?.release()
@@ -140,6 +147,7 @@ internal class PiperSpeechEngine(context: Context) {
     }
 
     private companion object {
+        val installationLock = Any()
         const val ARCHIVE_ASSET = "piper_es_ar_daniela_high_int8.tar.bz2"
         const val ARCHIVE_SHA256 = "7218f0a119e4c16533ac187f71ab3019f2092f1594e43fef8392ae1f5b64abab"
         const val BUNDLE_DIRECTORY = "vits-piper-es_AR-daniela-high-int8"

@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.hardware.camera2.CaptureRequest
 import android.os.Bundle
 import android.os.SystemClock
 import android.speech.RecognitionListener
@@ -31,7 +30,11 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
-import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.view.PreviewView
+import androidx.lifecycle.Lifecycle
+import android.os.Build
+import android.provider.Settings
+import android.net.Uri
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -48,7 +51,6 @@ import com.example.labdetect.databinding.FragmentCameraBinding
 import com.example.labdetect.speech.AndroidSpeechEngine
 import com.example.labdetect.viewmodel.CameraViewModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -63,7 +65,19 @@ class CameraFragment : Fragment() {
     private val viewModel: CameraViewModel by viewModels()
     private var activeCamera: Camera? = null
 
-    private lateinit var speechRecognizer: SpeechRecognizer
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var recognitionGeneration = 0
+    private var recognitionFallbackUsed = false
+    private var recognitionUsesDevice = false
+    private var recognitionTimeout: Runnable? = null
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var previewUseCase: Preview? = null
+    private var analysisUseCase: ImageAnalysis? = null
+    @Volatile private var cameraGeneration = 0
+    private var cameraStarting = false
+    private var cameraRetries = 0
+    private var cameraIssue: String? = null
+    private var cameraWatchdog: Runnable? = null
     private lateinit var speechEngine: AndroidSpeechEngine
     private lateinit var favoriteStore: FavoriteEquipmentStore
     private lateinit var interactionStore: EquipmentInteractionStore
@@ -92,16 +106,16 @@ class CameraFragment : Fragment() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions[Manifest.permission.CAMERA] == true) {
-            startCamera()
-        } else if (!cameraPermissionGranted()) {
-            Toast.makeText(context, "Se necesita la cámara para detectar equipos", Toast.LENGTH_SHORT).show()
-        }
-        binding.fabMic.isEnabled = true
-        if (startListeningAfterPermission) {
+    ) { _ ->
+        if (_binding != null) {
+            if (cameraPermissionGranted()) startCamera()
+            else showCameraIssue("Permiso de cámara pendiente · toca para habilitar")
+            val requestedVoice = startListeningAfterPermission
             startListeningAfterPermission = false
-            if (audioPermissionGranted()) beginVoiceCapture()
+            if (requestedVoice) {
+                if (audioPermissionGranted() && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) beginVoiceCapture()
+                else Toast.makeText(context, "El micrófono necesita permiso. Puedes escribir tu pregunta.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -117,15 +131,24 @@ class CameraFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         speechEngine = AndroidSpeechEngine(requireContext())
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(requireContext())
         favoriteStore = FavoriteEquipmentStore(requireContext())
         interactionStore = EquipmentInteractionStore(requireContext())
         equipmentCatalog = LocalEquipmentCatalog(requireContext())
         manualRepository = LocalManualRepository(requireContext())
         defaultMicTint = binding.fabMic.backgroundTintList
-        configureSpeechRecognizer()
 
         binding.fabMic.isEnabled = true
+        binding.viewFinder.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        binding.tvScanStatus.setOnClickListener {
+            if (!cameraPermissionGranted()) requestCameraPermission()
+            else { cameraRetries = 0; releaseCamera(); startCamera() }
+        }
+        binding.viewFinder.previewStreamState.observe(viewLifecycleOwner) { state ->
+            if (state == PreviewView.StreamState.STREAMING && activeCamera != null) {
+                cameraIssue = null
+                renderScannerStatus()
+            }
+        }
         requestMissingPermissions()
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val keyboard = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
@@ -167,7 +190,7 @@ class CameraFragment : Fragment() {
         }
 
         viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
-            binding.tvScanStatus.isVisible = result == null
+            binding.tvScanStatus.isVisible = result == null || cameraIssue != null
             binding.tvQuestionPrompt.isVisible = !keyboardVisible && result != null && voiceState == VoiceState.IDLE
             if (result == null) {
                 if (voiceState == VoiceState.IDLE) binding.answerCard.isVisible = false
@@ -207,13 +230,7 @@ class CameraFragment : Fragment() {
             binding.detectionOverlay.submitDetections(detections)
         }
 
-        viewModel.scannerStatus.observe(viewLifecycleOwner) { status ->
-            binding.tvScanStatus.text = when {
-                status.contains("AJUSTANDO") -> "Reconociendo equipo…"
-                status.contains("MODELO") -> "Detector no disponible"
-                else -> "Apunta a un equipo del laboratorio"
-            }
-        }
+        viewModel.scannerStatus.observe(viewLifecycleOwner) { renderScannerStatus() }
 
         viewModel.modelReady.observe(viewLifecycleOwner) { ready ->
             if (!ready) {
@@ -267,29 +284,41 @@ class CameraFragment : Fragment() {
     }
 
     private fun requestMissingPermissions() {
-        val missing = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO).filter {
+        val missing = arrayOf(Manifest.permission.CAMERA).filter {
             ContextCompat.checkSelfPermission(requireContext(), it) != PackageManager.PERMISSION_GRANTED
         }
-        if (missing.isNotEmpty()) requestPermissionLauncher.launch(missing.toTypedArray())
+        if (missing.isNotEmpty()) {
+            val asked = requireContext().getSharedPreferences("permissions", 0).getBoolean("cameraRequested", false)
+            if (!asked) requestCameraPermission()
+            else showCameraIssue("Permiso de cámara pendiente · toca para habilitar")
+        }
     }
 
-    private fun configureSpeechRecognizer() {
-        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+    private fun configureSpeechRecognizer(forceSystem: Boolean): Boolean {
+        destroyRecognizer()
+        recognitionUsesDevice = !forceSystem && Build.VERSION.SDK_INT >= 31 &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(requireContext())
+        if (!recognitionUsesDevice && !SpeechRecognizer.isRecognitionAvailable(requireContext())) return false
+        speechRecognizer = if (recognitionUsesDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(requireContext())
+            else SpeechRecognizer.createSpeechRecognizer(requireContext())
+        val session = recognitionGeneration
+        speechRecognizer!!.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                if (voiceState != VoiceState.LISTENING) return
+                if (_binding == null || session != recognitionGeneration || voiceState != VoiceState.LISTENING) return
                 isListening = true
+                armRecognitionTimeout(30_000L)
                 showListeningFeedback("Escuchando · toca otra vez para enviar")
             }
 
             override fun onResults(results: Bundle?) {
-                if (voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
+                if (_binding == null || session != recognitionGeneration || voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
                 isListening = false
                 val text = bestTranscript(results).ifBlank { partialTranscript }
                 handleRecognizedText(text)
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
-                if (voiceState != VoiceState.LISTENING) return
+                if (_binding == null || session != recognitionGeneration || voiceState != VoiceState.LISTENING) return
                 partialTranscript = partialResults
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull().orEmpty()
@@ -300,11 +329,22 @@ class CameraFragment : Fragment() {
             }
 
             override fun onError(error: Int) {
-                if (voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
+                if (_binding == null || session != recognitionGeneration || voiceState !in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) return
                 val usablePartial = partialTranscript.takeIf { it.length >= 3 }
                 if (usablePartial != null) {
                     isListening = false
                     handleRecognizedText(usablePartial)
+                    return
+                }
+                Log.w("LabVoice", "Recognition error=$error device=$recognitionUsesDevice")
+                if (!recognitionFallbackUsed && error in setOf(
+                        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_CLIENT,
+                        SpeechRecognizer.ERROR_SERVER_DISCONNECTED, SpeechRecognizer.ERROR_NETWORK,
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT)) {
+                    recognitionFallbackUsed = true
+                    voiceState = VoiceState.LISTENING
+                    startVoiceQuestion(forceSystem = true)
                     return
                 }
                 finishInteraction(cancelled = true)
@@ -313,13 +353,19 @@ class CameraFragment : Fragment() {
                         "No alcancé a escucharte. Toca el micrófono e inténtalo de nuevo."
                     SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
                         "No hay reconocimiento de voz disponible. Puedes escribir la pregunta."
-                    else -> "No pude escuchar bien. También puedes escribir la pregunta."
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                        "Activa el permiso de micrófono para LabDetect en Ajustes."
+                    SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
+                        "El reconocimiento de español no está instalado. Revisa los idiomas de voz de tu teléfono."
+                    SpeechRecognizer.ERROR_AUDIO -> "El micrófono no está disponible. Revisa si otra aplicación lo está usando."
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "El servicio de voz está ocupado. Vuelve a tocar el micrófono."
+                    else -> "El servicio de voz no respondió. Vuelve a intentarlo o escribe tu pregunta."
                 }
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
 
             override fun onRmsChanged(rmsdB: Float) {
-                if (voiceState != VoiceState.LISTENING || _binding == null) return
+                if (voiceState != VoiceState.LISTENING || _binding == null || session != recognitionGeneration) return
                 val pulse = (1.05f + (rmsdB.coerceIn(0f, 12f) / 100f))
                 binding.fabMic.scaleX = pulse
                 binding.fabMic.scaleY = pulse
@@ -327,20 +373,39 @@ class CameraFragment : Fragment() {
 
             override fun onBeginningOfSpeech() = Unit
             override fun onBufferReceived(buffer: ByteArray?) = Unit
-            override fun onEndOfSpeech() = Unit
+            override fun onEndOfSpeech() {
+                if (_binding != null && session == recognitionGeneration && voiceState == VoiceState.LISTENING) {
+                    armRecognitionTimeout(5_000L)
+                }
+            }
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
         })
+        return true
     }
 
     private fun handleMicClick() {
         when (voiceState) {
             VoiceState.IDLE -> {
                 if (!audioPermissionGranted()) {
+                    val prefs = requireContext().getSharedPreferences("permissions", 0)
+                    if (prefs.getBoolean("microphoneRequested", false) &&
+                        !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle("Permiso de micrófono")
+                            .setMessage("Activa Micrófono en los permisos de LabDetect para preguntar por voz.")
+                            .setPositiveButton("Abrir ajustes") { _, _ ->
+                                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.parse("package:" + requireContext().packageName)))
+                            }.setNegativeButton("Ahora no", null).show()
+                        return
+                    }
+                    prefs.edit().putBoolean("microphoneRequested", true).apply()
                     startListeningAfterPermission = true
                     requestPermissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                     return
                 }
-                if (!SpeechRecognizer.isRecognitionAvailable(requireContext())) {
+                if (!SpeechRecognizer.isRecognitionAvailable(requireContext()) &&
+                    !(Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(requireContext()))) {
                     Toast.makeText(context, "La voz no está disponible; escribe tu pregunta.", Toast.LENGTH_SHORT).show()
                     return
                 }
@@ -367,6 +432,7 @@ class CameraFragment : Fragment() {
         partialTranscript = ""
         pendingTranscript = ""
         submitWhenReady = false
+        recognitionFallbackUsed = false
         voiceState = VoiceState.LISTENING
         binding.fabMic.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         startVoiceQuestion()
@@ -379,9 +445,10 @@ class CameraFragment : Fragment() {
         showVoiceState("Procesando lo que dijiste…")
         binding.fabMic.setImageResource(R.drawable.ic_mic)
         binding.fabMic.animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
-        runCatching { speechRecognizer.stopListening() }
+        runCatching { speechRecognizer?.stopListening() }
+        val session = recognitionGeneration
         mainHandler.postDelayed({
-            if (_binding != null && voiceState == VoiceState.AWAITING_RESULT) {
+            if (_binding != null && session == recognitionGeneration && voiceState == VoiceState.AWAITING_RESULT) {
                 if (partialTranscript.isNotBlank()) {
                     submitRecognizedQuestion(partialTranscript)
                 } else {
@@ -393,6 +460,7 @@ class CameraFragment : Fragment() {
     }
 
     private fun handleRecognizedText(text: String) {
+        destroyRecognizer()
         if (text.isBlank()) {
             finishInteraction(cancelled = true)
             Toast.makeText(context, "No escuché una pregunta. Toca para intentarlo otra vez.", Toast.LENGTH_SHORT).show()
@@ -410,10 +478,15 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun startVoiceQuestion() {
+    private fun startVoiceQuestion(forceSystem: Boolean = false) {
+        if (!runCatching { configureSpeechRecognizer(forceSystem) }.getOrDefault(false)) {
+            finishInteraction(cancelled = true)
+            Toast.makeText(context, "No hay un servicio de reconocimiento de voz disponible. Revisa los servicios de voz del teléfono.", Toast.LENGTH_LONG).show()
+            return
+        }
         isListening = true
         showListeningFeedback("Escuchando · toca otra vez para enviar")
-        val locale = Locale("es", "EC").toLanguageTag()
+        val locale = "es"
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
@@ -421,16 +494,41 @@ class CameraFragment : Fragment() {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, requireContext().packageName)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, recognitionUsesDevice)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
             putStringArrayListExtra("android.speech.extra.BIASING_STRINGS", ArrayList(speechVocabulary()))
         }
-        runCatching { speechRecognizer.startListening(intent) }
+        armRecognitionTimeout(8_000L)
+        runCatching { speechRecognizer?.startListening(intent) }
             .onFailure {
                 finishInteraction(cancelled = true)
                 Toast.makeText(context, "No pude iniciar el micrófono; escribe tu pregunta.", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    private fun destroyRecognizer() {
+        recognitionGeneration++
+        recognitionTimeout?.let(mainHandler::removeCallbacks)
+        recognitionTimeout = null
+        runCatching { speechRecognizer?.cancel() }
+        runCatching { speechRecognizer?.destroy() }
+        speechRecognizer = null
+    }
+
+    private fun armRecognitionTimeout(delay: Long) {
+        recognitionTimeout?.let(mainHandler::removeCallbacks)
+        val session = recognitionGeneration
+        recognitionTimeout = Runnable {
+            if (_binding != null && session == recognitionGeneration &&
+                voiceState in setOf(VoiceState.LISTENING, VoiceState.AWAITING_RESULT)) {
+                if (partialTranscript.isNotBlank()) handleRecognizedText(partialTranscript)
+                else {
+                    finishInteraction(cancelled = true)
+                    Toast.makeText(context, "La voz no respondió a tiempo. Toca el micrófono para reintentar.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.also { mainHandler.postDelayed(it, delay) }
     }
 
     private fun bestTranscript(results: Bundle?): String {
@@ -455,6 +553,7 @@ class CameraFragment : Fragment() {
 
     private fun submitRecognizedQuestion(text: String) {
         if (voiceState in setOf(VoiceState.PROCESSING, VoiceState.SPEAKING) || text.isBlank()) return
+        destroyRecognizer()
         isListening = false
         submitWhenReady = false
         pendingTranscript = ""
@@ -505,6 +604,8 @@ class CameraFragment : Fragment() {
     }
 
     private fun finishInteraction(cancelled: Boolean = false) {
+        destroyRecognizer()
+        if (_binding == null) return
         isListening = false
         submitWhenReady = false
         pendingTranscript = ""
@@ -612,71 +713,138 @@ class CameraFragment : Fragment() {
             .show()
     }
 
-    private fun startCamera() {
-        val currentBinding = _binding ?: return
-        if (!currentBinding.viewFinder.isLaidOut) {
-            currentBinding.viewFinder.doOnLayout {
-                if (_binding === currentBinding) startCamera()
-            }
-            return
+    private fun renderScannerStatus() {
+        val current = _binding ?: return
+        current.tvScanStatus.text = cameraIssue ?: when {
+            viewModel.scannerStatus.value.orEmpty().contains("AJUSTANDO") -> "Reconociendo equipo…"
+            viewModel.scannerStatus.value.orEmpty().contains("MODELO") -> "Detector no disponible"
+            else -> "Apunta a un equipo del laboratorio"
         }
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
-        cameraProviderFuture.addListener({
-            if (_binding !== currentBinding) return@addListener
-            val cameraProvider = cameraProviderFuture.get()
-            val previewBuilder = Preview.Builder()
-                .setTargetResolution(Size(1920, 1080))
-            Camera2Interop.Extender(previewBuilder)
-                .setCaptureRequestOption(
-                    CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
-                )
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
-            val preview = previewBuilder.build().also {
-                it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
-            }
-            val analysis = ImageAnalysis.Builder()
-                // Una fuente 720p conserva detalle y permite al autofocus/exposición
-                // trabajar mejor; YOLO la reduce internamente a sus 640 px.
-                .setTargetResolution(Size(1280, 720))
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setTargetRotation(binding.viewFinder.display.rotation)
-                .build()
-                .also { useCase ->
-                    useCase.setAnalyzer(cameraAnalysisExecutor) { imageProxy ->
-                        analyzeCameraFrame(imageProxy)
+        current.tvScanStatus.isVisible = cameraIssue != null || viewModel.classificationResult.value == null
+    }
+
+    private fun showCameraIssue(message: String) {
+        cameraIssue = message
+        renderScannerStatus()
+    }
+
+    private fun requestCameraPermission() {
+        val prefs = requireContext().getSharedPreferences("permissions", 0)
+        if (prefs.getBoolean("cameraRequested", false) && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Permiso de cámara")
+                .setMessage("Activa Cámara en los permisos de LabDetect para reconocer equipos.")
+                .setPositiveButton("Abrir ajustes") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + requireContext().packageName)))
+                }.setNegativeButton("Ahora no", null).show()
+        } else {
+            prefs.edit().putBoolean("cameraRequested", true).apply()
+            requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+        }
+    }
+
+    private fun startCamera() {
+        val current = _binding ?: return
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !cameraPermissionGranted() ||
+            cameraStarting || activeCamera != null) return
+        cameraStarting = true
+        val session = ++cameraGeneration
+        current.viewFinder.doOnLayout {
+            if (_binding !== current || session != cameraGeneration) return@doOnLayout
+            showCameraIssue("Iniciando cámara…")
+            val future = ProcessCameraProvider.getInstance(requireContext())
+            future.addListener({
+                if (_binding !== current || session != cameraGeneration ||
+                    !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@addListener
+                try {
+                    val provider = future.get()
+                    cameraProvider = provider
+                    check(provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) { "No rear camera" }
+                    val rotation = current.viewFinder.display?.rotation ?: android.view.Surface.ROTATION_0
+                    val previewBuilder = Preview.Builder().setTargetRotation(rotation)
+                    val analysisBuilder = ImageAnalysis.Builder().setTargetRotation(rotation)
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    // CameraX selects a supported resolution pair on a recovery attempt.
+                    if (cameraRetries == 0) {
+                        previewBuilder.setTargetResolution(Size(1920, 1080))
+                        analysisBuilder.setTargetResolution(Size(1280, 720))
                     }
+                    val preview = previewBuilder.build()
+                    val analysis = analysisBuilder.build()
+                    previewUseCase = preview
+                    analysisUseCase = analysis
+                    preview.setSurfaceProvider(current.viewFinder.surfaceProvider)
+                    analysis.setAnalyzer(cameraAnalysisExecutor) { proxy ->
+                        if (session == cameraGeneration) analyzeCameraFrame(proxy, session) else proxy.close()
+                    }
+                    val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis)
+                    current.viewFinder.viewPort?.let { group.setViewPort(it) }
+                    activeCamera = provider.bindToLifecycle(viewLifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group.build())
+                    cameraStarting = false
+                    viewModel.resumeDetection()
+                    activeCamera?.cameraInfo?.cameraState?.observe(viewLifecycleOwner) { state ->
+                        if (session == cameraGeneration && state.error != null) {
+                            Log.w("LabCamera", "CameraX error=" + state.error?.code)
+                            showCameraIssue("Cámara no disponible · revisa acceso o toca para reintentar")
+                            mainHandler.postDelayed({
+                                if (session == cameraGeneration && _binding != null) recoverCamera()
+                            }, 500L)
+                        }
+                    }
+                    cameraWatchdog = Runnable {
+                        if (_binding === current && session == cameraGeneration &&
+                            lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                            current.viewFinder.previewStreamState.value != PreviewView.StreamState.STREAMING) {
+                            recoverCamera()
+                        }
+                    }.also { mainHandler.postDelayed(it, 5_000L) }
+                } catch (error: Exception) {
+                    Log.e("LabCamera", "CameraX bind failed", error)
+                    recoverCamera()
                 }
-            try {
-                cameraProvider.unbindAll()
-                val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis)
-                binding.viewFinder.viewPort?.let { group.setViewPort(it) }
-                activeCamera = cameraProvider.bindToLifecycle(
-                    viewLifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    group.build()
-                )
-                focusAndMeterAt(currentBinding.viewFinder.width / 2f, currentBinding.viewFinder.height / 2f)
-            } catch (exception: Exception) {
-                Log.e("CameraFragment", "No se pudo iniciar CameraX", exception)
-                Toast.makeText(context, "No pude iniciar la cámara.", Toast.LENGTH_SHORT).show()
-            }
-        }, ContextCompat.getMainExecutor(requireContext()))
+            }, ContextCompat.getMainExecutor(requireContext()))
+        }
+    }
+
+    private fun recoverCamera() {
+        releaseCamera()
+        if (_binding == null || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+        if (cameraRetries++ < 2 && cameraPermissionGranted()) {
+            val session = cameraGeneration
+            mainHandler.postDelayed({
+                if (session == cameraGeneration && _binding != null) startCamera()
+            }, 500L)
+        } else showCameraIssue("No se pudo abrir la cámara · toca para reintentar")
+    }
+
+    private fun releaseCamera() {
+        cameraGeneration++
+        cameraStarting = false
+        cameraWatchdog?.let(mainHandler::removeCallbacks)
+        cameraWatchdog = null
+        activeCamera?.cameraInfo?.cameraState?.removeObservers(viewLifecycleOwner)
+        analysisUseCase?.clearAnalyzer()
+        val owned = listOfNotNull(previewUseCase, analysisUseCase)
+        if (owned.isNotEmpty()) runCatching { cameraProvider?.unbind(*owned.toTypedArray()) }
+        activeCamera = null
+        previewUseCase = null
+        analysisUseCase = null
+        viewModel.pauseDetection()
     }
 
     private fun focusAndMeterAt(x: Float, y: Float) {
         val camera = activeCamera ?: return
-        val point = binding.viewFinder.meteringPointFactory.createPoint(x, y)
-        val action = FocusMeteringAction.Builder(
-            point,
-            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
-        ).setAutoCancelDuration(2, TimeUnit.SECONDS).build()
-        camera.cameraControl.startFocusAndMetering(action)
+        val current = _binding ?: return
+        val point = current.viewFinder.meteringPointFactory.createPoint(x, y)
+        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+            .setAutoCancelDuration(2, TimeUnit.SECONDS).build()
+        if (camera.cameraInfo.isFocusMeteringSupported(action)) runCatching {
+            camera.cameraControl.startFocusAndMetering(action)
+        }
     }
 
     /** Analiza el fotograma original que entrega CameraX, no una captura de la vista previa. */
-    private fun analyzeCameraFrame(imageProxy: ImageProxy) {
+    private fun analyzeCameraFrame(imageProxy: ImageProxy, session: Int) {
         try {
             val now = SystemClock.elapsedRealtime()
             if (!viewModel.canAcceptFrame() || now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
@@ -694,6 +862,7 @@ class CameraFragment : Fragment() {
                     Bitmap.createScaledBitmap(it, 120, (120f * frameHeight / frameWidth).toInt().coerceAtLeast(1), true)
                 } else null
                 mainHandler.post {
+                    if (session != cameraGeneration) return@post
                     _binding?.detectionOverlay?.setSourceFrameSize(frameWidth, frameHeight)
                     if (backdrop != null && _binding != null) {
                         latestBackdrop = backdrop
@@ -701,7 +870,7 @@ class CameraFragment : Fragment() {
                         binding.conversationCard.setBackdrop(backdrop)
                     }
                 }
-                viewModel.onImageCaptured(it)
+                if (session == cameraGeneration) viewModel.onImageCaptured(it) else it.recycle()
             }
         } finally {
             imageProxy.close()
@@ -743,18 +912,34 @@ class CameraFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        cameraRetries = 0
         if (cameraPermissionGranted()) startCamera()
+        else showCameraIssue("Permiso de cámara pendiente · toca para habilitar")
+    }
+
+    override fun onPause() {
+        if (cameraStarting) releaseCamera()
+        destroyRecognizer()
+        voiceState = VoiceState.IDLE
+        viewModel.cancelAssistant()
+        speechEngine.stop()
+        if (_binding != null) finishInteraction(cancelled = true)
+        super.onPause()
+    }
+
+    override fun onStop() {
+        releaseCamera()
+        super.onStop()
     }
 
     override fun onDestroyView() {
+        releaseCamera()
         mainHandler.removeCallbacksAndMessages(null)
-        runCatching { speechRecognizer.cancel() }
-        speechRecognizer.destroy()
+        destroyRecognizer()
         speechEngine.close()
-        viewModel.endQuestionSession()
-        activeCamera = null
         latestBackdrop = null
         cardTarget = null
+        activeQuestionFrame = null
         keyboardVisible = false
         _binding = null
         super.onDestroyView()

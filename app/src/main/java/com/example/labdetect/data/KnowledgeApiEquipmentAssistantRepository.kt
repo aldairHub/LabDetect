@@ -7,14 +7,31 @@ import com.example.labdetect.BuildConfig
 import com.example.labdetect.domain.EquipmentAssistantRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import android.util.Log
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Callback
+import okhttp3.Call
+import okhttp3.Response
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.ArrayDeque
 
 /** Asistente autónomo de la APK: usa el manual incluido y llama a OpenAI desde el teléfono. */
-class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssistantRepository {
+class KnowledgeApiEquipmentAssistantRepository(
+    context: Context,
+    private val transport: (suspend (String, JSONObject) -> Pair<Int, String>)? = null,
+    private val apiKeyOverride: String? = null,
+    private val networkAvailable: (() -> Boolean)? = null
+) : EquipmentAssistantRepository {
     private val appContext = context.applicationContext
     private val localManuals = LocalManualRepository(appContext)
     private val conversationMemory = AssistantConversationMemory()
@@ -27,7 +44,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         conversationMemory.cachedAnswerFor(equipmentId, question)?.let {
             return@withContext it
         }
-        val apiKey = BuildConfig.OPENAI_API_KEY.trim()
+        val apiKey = (apiKeyOverride ?: BuildConfig.OPENAI_API_KEY).trim()
         if (apiKey.isBlank() || !hasInternet()) {
             return@withContext localManuals.answerOffline(equipmentId, question)
         }
@@ -38,7 +55,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         val manualText = manual?.fullText?.trim().orEmpty()
 
         val conversationContext = conversationMemory.contextFor(equipmentId)
-        val manualAnswer = runCatching {
+        val manualAnswer = requestSafely {
             requestAnswer(
                 apiKey = apiKey,
                 equipmentName = equipmentName,
@@ -48,14 +65,14 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
                 conversationContext = conversationContext,
                 reasoningEffort = "low"
             )
-        }.getOrNull()
+        }
         val answerFromManual = manualAnswer
-            ?: return@withContext localManuals.answerOffline(equipmentId, question)
+            ?: return@withContext onlineFailureFallback(equipmentId, question)
         when {
             answerFromManual.contains(OUT_OF_SCOPE_MARKER) -> OUT_OF_SCOPE_MESSAGE
             answerFromManual.contains(MANUAL_INFO_MISSING_MARKER) -> {
                 // Solo se paga una búsqueda web cuando el manual del equipo no cubre la pregunta.
-                val webAnswer = runCatching {
+                val webAnswer = requestSafely {
                     requestAnswer(
                         apiKey = apiKey,
                         equipmentName = equipmentName,
@@ -65,9 +82,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
                         conversationContext = conversationContext,
                         reasoningEffort = "medium"
                     )
-                }.getOrElse {
-                    "No cuento con esa información dentro de mis manuales y ahora no pude completar una búsqueda en internet."
-                }
+                } ?: return@withContext onlineFailureFallback(equipmentId, question)
                 conversationMemory.remember(equipmentId, question, webAnswer)
                 webAnswer
             }
@@ -79,6 +94,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
     }
 
     private fun hasInternet(): Boolean {
+        networkAvailable?.let { return it() }
         val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return false
         val network = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(network) ?: return false
@@ -86,7 +102,23 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
-    private fun requestAnswer(
+    private suspend fun requestSafely(block: suspend () -> String): String? = try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Log.w("LabAssistant", "Request failed: " + error.message?.take(100))
+        null
+    }
+
+    private fun onlineFailureFallback(equipmentId: String, question: String): String {
+        val local = localManuals.answerOffline(equipmentId, question)
+        return if (local.contains("Sin conexión") || local.contains("Cuando haya internet")) {
+            "No pude verificar ese dato ahora. Puedes volver a preguntarme para reintentar la búsqueda."
+        } else "$local No pude consultar información adicional en este momento."
+    }
+
+    private suspend fun requestAnswer(
         apiKey: String,
         equipmentName: String,
         manualText: String,
@@ -148,7 +180,7 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             .put("instructions", instructions)
             .put("input", input)
             .put("reasoning", JSONObject().put("effort", reasoningEffort))
-            .put("max_output_tokens", 180)
+            .put("max_output_tokens", if (useWebSearch) 4096 else 1536)
             .put("max_tool_calls", 1)
             .put("parallel_tool_calls", false)
             .put("store", false)
@@ -161,13 +193,17 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
             payload.put("tool_choice", "required")
         }
 
-        val response = postResponse(apiKey, payload)
+        val response = transport?.invoke(apiKey, payload) ?: postResponse(apiKey, payload)
         if (response.first !in 200..299) {
-            error("OpenAI respondió con HTTP ${response.first}")
+            val code = runCatching { JSONObject(response.second).optJSONObject("error")?.optString("code") }.getOrNull()
+            error("HTTP ${response.first}, code=${code.orEmpty()}")
         }
 
         val document = JSONObject(response.second)
-        check(document.optString("status") == "completed") { "Respuesta incompleta de OpenAI" }
+        check(document.optString("status") == "completed") {
+            "Response status=" + document.optString("status") + ", reason=" +
+                document.optJSONObject("incomplete_details")?.optString("reason")
+        }
         if (useWebSearch) {
             val output = document.optJSONArray("output") ?: JSONArray()
             check((0 until output.length()).any {
@@ -180,26 +216,30 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
         return answer.takeIf { it.isNotBlank() } ?: error("OpenAI devolvió una respuesta vacía")
     }
 
-    private fun postResponse(apiKey: String, payload: JSONObject): Pair<Int, String> {
-        val connection = (URL(RESPONSES_URL).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 75_000
-            doOutput = true
-            setRequestProperty("Authorization", "Bearer $apiKey")
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Accept", "application/json")
+    private suspend fun postResponse(apiKey: String, payload: JSONObject): Pair<Int, String> =
+        suspendCancellableCoroutine { continuation ->
+            val request = Request.Builder().url(RESPONSES_URL)
+                .header("Authorization", "Bearer $apiKey")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        try {
+                            val result = it.code to it.body?.string().orEmpty()
+                            if (continuation.isActive) continuation.resume(result)
+                        } catch (error: IOException) {
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                        }
+                    }
+                }
+            })
         }
-        try {
-            connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(payload.toString()) }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            return status to body
-        } finally {
-            connection.disconnect()
-        }
-    }
 
     private fun extractOutputText(response: JSONObject): String {
         val chunks = mutableListOf<String>()
@@ -219,6 +259,8 @@ class KnowledgeApiEquipmentAssistantRepository(context: Context) : EquipmentAssi
     }
 
     companion object {
+        private val client = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS).callTimeout(50, TimeUnit.SECONDS).build()
         private const val RESPONSES_URL = "https://api.openai.com/v1/responses"
         private const val OUT_OF_SCOPE_MARKER = "__FUERA_DEL_EQUIPO__"
         private const val MANUAL_INFO_MISSING_MARKER = "__SIN_INFORMACION_EN_MANUAL__"
