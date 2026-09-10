@@ -130,7 +130,8 @@ class KnowledgeApiEquipmentAssistantRepository(
         val sourceRules = if (useWebSearch) {
             """
             El manual local no contiene suficiente información. Investiga automáticamente en internet antes de responder.
-            Di brevemente que verificaste información adicional en internet, sin pedir permiso ni nombrar fuentes o enlaces.
+            NO menciones fuentes, nombres de sitios web ni incluyas enlaces o URLs. Prohibido decir "según tal sitio" o dar direcciones web.
+            Resume la información con tus propias palabras para que suene natural al ser leída.
             Si preguntan precio, da solo un rango aproximado en USD; nunca combines monedas ni inventes conversiones.
             """.trimIndent()
         } else {
@@ -147,8 +148,8 @@ class KnowledgeApiEquipmentAssistantRepository(
             cercano y técnico, como una persona que acompaña al usuario frente al equipo. Usa tuteo neutro
             ("tú", "puedes", "tienes"); nunca uses "vos", "vos tenés" ni voseo. Responde solamente
             sobre este equipo: $equipmentName. Si preguntan por otro tema, responde exactamente: $OUT_OF_SCOPE_MARKER.
-            No menciones archivos, fuentes, variantes
-            ni procesos internos. No uses Markdown, títulos, viñetas, enlaces ni citas. Responde directamente en
+            No menciones NUNCA archivos, fuentes, variantes ni procesos internos. Prohibido incluir enlaces,
+            URLs, direcciones web o citas. No uses Markdown, títulos ni viñetas. Responde directamente en
             una o dos oraciones completas de entre doce y veinticuatro palabras, redactadas como una conversación
             normal: clara, amable y sin frases robóticas ni introducciones largas.
             Nunca dejes una frase, una advertencia o una temperatura a medias. Si preguntan "qué es", "qué veo" o
@@ -211,9 +212,27 @@ class KnowledgeApiEquipmentAssistantRepository(
                 item?.optString("type") == "web_search_call" && item.optString("status") == "completed"
             }) { "La búsqueda web no se completó" }
         }
-        val answer = extractOutputText(document)
+        val answer = cleanAnswer(extractOutputText(document))
         if (answer.contains(OUT_OF_SCOPE_MARKER)) return if (useWebSearch) OUT_OF_SCOPE_MESSAGE else OUT_OF_SCOPE_MARKER
         return answer.takeIf { it.isNotBlank() } ?: error("OpenAI devolvió una respuesta vacía")
+    }
+
+    private fun cleanAnswer(text: String): String {
+        // Elimina URLs típicas (http, https, www) y patrones de links
+        val urlPattern = Regex(
+            """(https?://|www\.)[^\s\)]+""",
+            RegexOption.IGNORE_CASE
+        )
+        // Elimina también menciones a fuentes comunes que la IA suele añadir
+        val sourcePattern = Regex(
+            """(Fuente|Source|Según|Consultado en):\s*[^\s\.]+(\.[^\s\.]+)*""",
+            RegexOption.IGNORE_CASE
+        )
+        
+        return text.replace(urlPattern, "")
+            .replace(sourcePattern, "")
+            .replace(Regex("""\s{2,}"""), " ") // Elimina espacios dobles creados
+            .trim()
     }
 
     private suspend fun postResponse(apiKey: String, payload: JSONObject): Pair<Int, String> =
