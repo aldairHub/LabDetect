@@ -41,7 +41,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _modelReady = MutableLiveData(detector.isReady)
     val modelReady: LiveData<Boolean> = _modelReady
 
-    private val _scannerStatus = MutableLiveData(if (detector.isReady) "ESCANEANDO · YOLO ACTIVO" else "MODELO NO DISPONIBLE")
+    private val _scannerStatus = MutableLiveData(if (detector.isReady) "◌  ESCANEANDO" else "MODELO NO DISPONIBLE")
     val scannerStatus: LiveData<String> = _scannerStatus
     private var lastScannerStatus = _scannerStatus.value.orEmpty()
 
@@ -91,10 +91,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         lastDetectedResult = detected
                         _classificationResult.postValue(detected)
-                        publishScannerStatus("UTEQ · DETECTADO")
+                        publishScannerStatus("●  EQUIPO RECONOCIDO")
                     } else {
                         preview.maxByOrNull { it.confidence }?.let {
-                            publishScannerStatus("UTEQ · ENFOCANDO ${"%.0f".format(it.confidence)}%")
+                            publishScannerStatus("◌  AJUSTANDO ${"%.0f".format(it.confidence)}%")
                         }
                     }
                 } else {
@@ -130,7 +130,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun canAcceptFrame(): Boolean = !inferenceRunning.get()
 
     fun reportFrameReadFailure() {
-        publishScannerStatus("CAMERA ACTIVA · NO PUDE LEER EL FOTOGRAMA")
+        publishScannerStatus("◌  CÁMARA ACTIVA")
     }
 
     fun askAssistant(question: String) {
@@ -197,7 +197,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _detections.postValue(emptyList())
         _classificationResult.postValue(null)
         lastDetectedResult = null
-        publishScannerStatus("UTEQ · ESCANEANDO")
+        publishScannerStatus("◌  ESCANEANDO")
     }
 
     companion object {

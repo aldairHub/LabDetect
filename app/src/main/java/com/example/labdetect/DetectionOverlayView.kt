@@ -16,7 +16,8 @@ class DetectionOverlayView @JvmOverloads constructor(
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.rgb(0, 230, 118)
         style = Paint.Style.STROKE
-        strokeWidth = 5f
+        strokeWidth = 4f
+        strokeCap = Paint.Cap.ROUND
     }
     private val candidatePaint = Paint(boxPaint).apply {
         color = Color.rgb(255, 193, 7)
@@ -42,11 +43,30 @@ class DetectionOverlayView @JvmOverloads constructor(
         super.onDraw(canvas)
         detections.forEach { detection ->
             val box = mapToPreview(detection)
-            canvas.drawRect(
-                box,
-                if (detection.confirmed) boxPaint else candidatePaint
-            )
+            val paint = if (detection.confirmed) boxPaint else candidatePaint
+            if (detection.confirmed) {
+                // La línea tenue conserva el contorno completo y las esquinas hacen
+                // que la caja se lea como un escáner preciso, sin texto duplicado.
+                paint.alpha = 150
+                canvas.drawRoundRect(box, 10f, 10f, paint)
+                paint.alpha = 255
+                drawCornerMarkers(canvas, box, paint)
+            } else {
+                canvas.drawRoundRect(box, 10f, 10f, paint)
+            }
         }
+    }
+
+    private fun drawCornerMarkers(canvas: Canvas, box: RectF, paint: Paint) {
+        val length = minOf(box.width(), box.height()) * 0.16f
+        canvas.drawLine(box.left, box.top + length, box.left, box.top, paint)
+        canvas.drawLine(box.left, box.top, box.left + length, box.top, paint)
+        canvas.drawLine(box.right - length, box.top, box.right, box.top, paint)
+        canvas.drawLine(box.right, box.top, box.right, box.top + length, paint)
+        canvas.drawLine(box.left, box.bottom - length, box.left, box.bottom, paint)
+        canvas.drawLine(box.left, box.bottom, box.left + length, box.bottom, paint)
+        canvas.drawLine(box.right - length, box.bottom, box.right, box.bottom, paint)
+        canvas.drawLine(box.right, box.bottom - length, box.right, box.bottom, paint)
     }
 
     private fun mapToPreview(detection: Detection): RectF {

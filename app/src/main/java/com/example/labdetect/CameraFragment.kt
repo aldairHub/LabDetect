@@ -126,6 +126,10 @@ class CameraFragment : Fragment() {
         binding.btnFeedbackCorrect.setOnClickListener { showCorrectionPicker() }
         binding.fabMic.setOnClickListener { handleMicClick() }
         binding.btnSendQuestion.setOnClickListener { submitTypedQuestion() }
+        binding.btnDismissAnswer.setOnClickListener {
+            binding.tvCameraAnswer.isVisible = false
+            binding.btnDismissAnswer.isVisible = false
+        }
         binding.viewFinder.setOnTouchListener { viewFinder, event ->
             if (event.action == MotionEvent.ACTION_UP) {
                 viewFinder.performClick()
@@ -190,6 +194,7 @@ class CameraFragment : Fragment() {
             val answer = event.consume() ?: return@observe
             binding.tvCameraAnswer.text = answer
             binding.tvCameraAnswer.isVisible = true
+            binding.btnDismissAnswer.isVisible = true
             binding.tvCameraAnswer.alpha = 0f
             binding.tvCameraAnswer.translationY = 8f * resources.displayMetrics.density
             binding.tvCameraAnswer.animate()

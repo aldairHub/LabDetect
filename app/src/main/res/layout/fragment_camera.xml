@@ -19,7 +19,7 @@
 
     <View
         android:layout_width="0dp"
-        android:layout_height="132dp"
+        android:layout_height="108dp"
         android:background="@drawable/bg_camera_top_scrim"
         android:importantForAccessibility="no"
         app:layout_constraintEnd_toEndOf="parent"
@@ -28,7 +28,7 @@
 
     <View
         android:layout_width="0dp"
-        android:layout_height="340dp"
+        android:layout_height="230dp"
         android:background="@drawable/bg_camera_bottom_scrim"
         android:importantForAccessibility="no"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -38,17 +38,17 @@
     <TextView
         android:id="@+id/tvScanStatus"
         android:layout_width="wrap_content"
-        android:layout_height="38dp"
+        android:layout_height="32dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/bg_status_pill"
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
-        android:letterSpacing="0.08"
-        android:paddingHorizontal="11dp"
-        android:text="BROMATOLOGÍA · UTEQ"
+        android:letterSpacing="0.04"
+        android:paddingHorizontal="10dp"
+        android:text="◌  ESCANEANDO"
         android:textColor="@color/lab_teal"
-        android:textSize="10sp"
+        android:textSize="9sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -82,10 +82,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="64dp"
+        android:layout_marginTop="54dp"
         android:visibility="gone"
         app:cardBackgroundColor="#F20B1F12"
-        app:cardCornerRadius="20dp"
+        app:cardCornerRadius="18dp"
         app:cardElevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -99,7 +99,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="11dp"
-            android:paddingVertical="7dp">
+                android:paddingVertical="6dp">
 
             <View
                 android:layout_width="4dp"
@@ -122,7 +122,7 @@
                     android:maxLines="1"
                     android:text="Equipo detectado"
                     android:textColor="@color/white"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -180,10 +180,10 @@
         android:id="@+id/conversationCard"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="10dp"
-        android:layout_marginBottom="10dp"
-        app:cardBackgroundColor="#F4091B10"
-        app:cardCornerRadius="24dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="12dp"
+        app:cardBackgroundColor="#F20A1C11"
+        app:cardCornerRadius="22dp"
         app:cardElevation="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -195,7 +195,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <TextView
                 android:id="@+id/tvVoiceState"
@@ -217,14 +217,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="4dp"
-                android:layout_marginBottom="10dp"
+                android:layout_marginBottom="8dp"
                 android:background="@drawable/bg_answer_bubble"
                 android:lineSpacingExtra="2dp"
-                android:maxLines="4"
-                android:padding="12dp"
+                android:maxLines="2"
+                android:padding="10dp"
                 android:textColor="@color/white"
                 android:textIsSelectable="true"
-                android:textSize="14sp"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDismissAnswer"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="end"
+                android:layout_marginTop="2dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="Ocultar"
+                android:textAllCaps="false"
+                android:textColor="@color/lab_muted_dark"
+                android:textSize="11sp"
                 android:visibility="gone" />
 
             <LinearLayout
@@ -295,11 +310,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
-                        android:hint="Pregunta sobre el equipo"
+                        android:hint="Pregunta sobre este equipo"
                         android:imeOptions="actionSend"
                         android:inputType="textCapSentences"
                         android:maxLines="1"
-                        android:minHeight="56dp"
+                        android:minHeight="52dp"
                         android:paddingHorizontal="16dp"
                         android:textColor="@color/white"
                         android:textColorHint="@color/lab_muted_dark" />
@@ -307,8 +322,8 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSendQuestion"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
                     android:layout_marginStart="8dp"
                     android:contentDescription="Enviar pregunta"
                     android:insetTop="0dp"
@@ -317,7 +332,7 @@
                     android:padding="0dp"
                     android:text=""
                     app:backgroundTint="@color/lab_teal_dark"
-                    app:cornerRadius="16dp"
+                    app:cornerRadius="26dp"
                     app:icon="@drawable/ic_send"
                     app:iconGravity="textStart"
                     app:iconPadding="0dp"
@@ -330,8 +345,8 @@
                     android:layout_marginStart="8dp"
                     android:contentDescription="Tocar para iniciar o terminar la pregunta"
                     app:backgroundTint="@color/lab_teal"
-                    app:fabCustomSize="58dp"
-                    app:elevation="6dp"
+                    app:fabCustomSize="52dp"
+                    app:elevation="2dp"
                     app:srcCompat="@drawable/ic_mic"
                     app:tint="@null" />
             </LinearLayout>
@@ -341,8 +356,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:paddingTop="8dp"
-                android:text="Toca para hablar  ·  toca de nuevo para enviar"
+                android:paddingTop="6dp"
+                android:text="Toca para hablar · toca de nuevo para enviar"
                 android:textColor="@color/lab_muted_dark"
                 android:textSize="10sp" />
 
